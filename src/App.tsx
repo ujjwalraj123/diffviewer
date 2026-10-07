@@ -64,6 +64,8 @@ function App() {
           original={left}
           modified={right}
           dark={dark}
+          onOriginalChange={setLeft}
+          onModifiedChange={setRight}
         />
       )}
     </div>
