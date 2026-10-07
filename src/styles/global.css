@@ -1,0 +1,152 @@
+/* ── Light theme (default) ── */
+:root {
+  --canvas: #FFFFFF;
+  --chrome: #F4F6FA;
+  --border: #D8DCE3;
+  --ink: #16181D;
+  --muted: #6B7280;
+  --prose: #3F4653;
+  --action: #126BCF;
+  --action-soft: #EAF2FD;
+  --ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --data: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --toggle-bg: #D8DCE3;
+  --toggle-knob: #FFFFFF;
+}
+
+/* ── Dark theme ── */
+[data-theme='dark'] {
+  --canvas: #0D1117;
+  --chrome: #161B22;
+  --border: #30363D;
+  --ink: #E6EDF3;
+  --muted: #8B949E;
+  --prose: #C9D1D9;
+  --action: #58A6FF;
+  --action-soft: #1C2D3F;
+  --toggle-bg: #58A6FF;
+  --toggle-knob: #0D1117;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
+}
+
+:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  height: 44px;
+  flex-wrap: wrap;
+  min-height: 44px;
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.mark svg { color: var(--action); }
+
+.divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+.spacer { flex: 1; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover { background: var(--action-soft); border-color: var(--action); }
+
+.btn.active {
+  background: var(--action-soft);
+  border-color: var(--action);
+  color: var(--action);
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.seg .btn { border: none; border-radius: 0; }
+.seg .btn + .btn { border-left: 1px solid var(--border); }
+
+/* ── Theme toggle switch ── */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.theme-toggle input { display: none; }
+
+.toggle-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--toggle-bg);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--toggle-knob);
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.theme-toggle input:checked + .toggle-track .toggle-knob {
+  transform: translateX(14px);
+}
+
+.toggle-icon {
+  font-size: 13px;
+  line-height: 1;
+}
