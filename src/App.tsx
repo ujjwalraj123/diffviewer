@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Toolbar } from './components/Toolbar'
 import { TextEditorPair } from './components/TextEditorPair'
 import { DiffEditorPanel } from './components/DiffEditorPanel'
@@ -25,6 +25,12 @@ function App() {
   const [language, setLanguage] = useState('javascript')
   const [left, setLeft] = useState(SAMPLE_LEFT)
   const [right, setRight] = useState(SAMPLE_RIGHT)
+  const [dark, setDark] = useState(false)
+
+  // Apply data-theme to <html> so CSS vars cascade everywhere
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  }, [dark])
 
   const clear = () => {
     setLeft('')
@@ -39,6 +45,8 @@ function App() {
         language={language}
         onLanguageChange={setLanguage}
         onClear={clear}
+        dark={dark}
+        onToggleDark={() => setDark(d => !d)}
       />
 
       {mode === 'edit' ? (
@@ -48,12 +56,14 @@ function App() {
           right={right}
           onLeftChange={setLeft}
           onRightChange={setRight}
+          dark={dark}
         />
       ) : (
         <DiffEditorPanel
           language={language}
           original={left}
           modified={right}
+          dark={dark}
         />
       )}
     </div>

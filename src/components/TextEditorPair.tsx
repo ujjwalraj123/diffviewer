@@ -8,6 +8,7 @@ interface TextEditorPairProps {
   right: string
   onLeftChange: (v: string) => void
   onRightChange: (v: string) => void
+  dark: boolean
 }
 
 const baseOptions = {
@@ -18,29 +19,30 @@ const baseOptions = {
   scrollBeyondLastLine: false,
   wordWrap: 'on' as const,
   automaticLayout: true,
-  padding: { top: 12, bottom: 12 },
+  padding: { top: 10, bottom: 10 },
   renderOverviewRuler: false,
   scrollbar: { vertical: 'auto' as const, horizontal: 'auto' as const, useShadows: false },
   tabSize: 2,
 }
 
 export function TextEditorPair({
-  language, left, right, onLeftChange, onRightChange,
+  language, left, right, onLeftChange, onRightChange, dark,
 }: TextEditorPairProps) {
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null)
-  useMonacoTheme(monacoRef.current)
+  useMonacoTheme(monacoRef.current, dark)
 
   const handleMount: OnMount = useCallback((_editor, monaco) => {
     monacoRef.current = monaco
-    monaco.editor.setTheme('csv-viewer-light')
   }, [])
+
+  const theme = dark ? 'dv-dark' : 'dv-light'
 
   return (
     <div className="panes">
       <div className="pane">
         <div className="pane-header">
           <span>Original</span>
-          <span className="tag">{left.length} chars</span>
+          <span className="tag">{left.length} ch</span>
         </div>
         <div className="pane-body">
           <Editor
@@ -48,7 +50,7 @@ export function TextEditorPair({
             language={language}
             value={left}
             onChange={(v) => onLeftChange(v ?? '')}
-            theme="csv-viewer-light"
+            theme={theme}
             onMount={handleMount}
             options={baseOptions}
           />
@@ -60,7 +62,7 @@ export function TextEditorPair({
       <div className="pane">
         <div className="pane-header">
           <span>Modified</span>
-          <span className="tag">{right.length} chars</span>
+          <span className="tag">{right.length} ch</span>
         </div>
         <div className="pane-body">
           <Editor
@@ -68,7 +70,7 @@ export function TextEditorPair({
             language={language}
             value={right}
             onChange={(v) => onRightChange(v ?? '')}
-            theme="csv-viewer-light"
+            theme={theme}
             onMount={handleMount}
             options={baseOptions}
           />
