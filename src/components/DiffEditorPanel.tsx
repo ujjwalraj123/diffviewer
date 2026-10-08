@@ -1,18 +1,3 @@
-/**
- * DiffEditorPanel — lean orchestrator
- *
- * Responsibilities:
- *   • Mount the Monaco DiffEditor
- *   • Detect cursor position changes on both sides → resolve selected lines
- *   • Propagate edits made inside the diff editor back to App state
- *     (onOriginalChange / onModifiedChange) so the Edit panel stays in sync
- *   • Render SelectedLineRow panels + shared scrollbar
- *
- * All pure helpers live in src/lib/lineMapping.ts
- * The shared-scroll logic lives in src/hooks/useSharedScroll.ts
- * The panel UI lives in src/components/SelectedLineRow.tsx
- */
-
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { DiffEditor, type DiffOnMount } from '@monaco-editor/react'
 import type * as MonacoNS from 'monaco-editor'
@@ -22,16 +7,12 @@ import { mapOrigToMod, mapModToOrig, getLineText } from '../lib/lineMapping'
 import { SelectedLineRow } from './SelectedLineRow'
 import { CopyButton } from './CopyButton'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface DiffEditorPanelProps {
   language: string
   original: string
   modified: string
   dark: boolean
-  /** Called when the user edits the original side inside the diff editor */
   onOriginalChange: (value: string) => void
-  /** Called when the user edits the modified side inside the diff editor */
   onModifiedChange: (value: string) => void
 }
 
@@ -41,8 +22,6 @@ interface SelectedLines {
   origText: string
   modText:  string
 }
-
-// ─── Editor options (stable reference — never recreated) ─────────────────────
 
 const EDITOR_OPTIONS: MonacoNS.editor.IDiffEditorConstructionOptions = {
   renderSideBySide: true,
@@ -185,6 +164,14 @@ export function DiffEditorPanel({
   const lastPushedOrigRef = useRef(original)
   const lastPushedModRef  = useRef(modified)
 
+  // Freeze the values handed to <DiffEditor> at their *initial* value. The
+  // library resets the model (and the cursor) whenever these props change, so
+  // we must never let them change after mount. All subsequent external updates
+  // are applied imperatively in the useEffect below instead. We use lazy state
+  // (not a ref) so the value is safe to read during render.
+  const [initialOrig] = useState(original)
+  const [initialMod]  = useState(modified)
+
   useEffect(() => {
     const editor = diffEditorRef.current
     if (!editor) return
@@ -192,9 +179,19 @@ export function DiffEditorPanel({
     const origModel = editor.getOriginalEditor().getModel()
     const modModel  = editor.getModifiedEditor().getModel()
 
-    // Only update the model when the incoming prop differs from what we last
-    // pushed — i.e. the change came from outside (Edit panel), not from us.
-    if (origModel && original !== lastPushedOrigRef.current) {
+    // Only update the model when the incoming prop differs from BOTH what we
+    // last pushed AND the model's current value. The second check is critical:
+    // when the user types in the main editor, that change echoes back as a new
+    // `original`/`modified` prop. In that case the prop already equals the
+    // model value, so we must NOT push it back — doing so calls
+    // pushEditOperations on the whole model and snaps the cursor to 1:1.
+    let didPush = false
+
+    if (
+      origModel &&
+      original !== lastPushedOrigRef.current &&
+      original !== origModel.getValue()
+    ) {
       lastPushedOrigRef.current = original
       suppressModelChangeRef.current = true
       origModel.pushEditOperations([], [{
@@ -202,9 +199,16 @@ export function DiffEditorPanel({
         text: original,
       }], () => null)
       suppressModelChangeRef.current = false
+      didPush = true
+    } else {
+      lastPushedOrigRef.current = original
     }
 
-    if (modModel && modified !== lastPushedModRef.current) {
+    if (
+      modModel &&
+      modified !== lastPushedModRef.current &&
+      modified !== modModel.getValue()
+    ) {
       lastPushedModRef.current = modified
       suppressModelChangeRef.current = true
       modModel.pushEditOperations([], [{
@@ -212,9 +216,14 @@ export function DiffEditorPanel({
         text: modified,
       }], () => null)
       suppressModelChangeRef.current = false
+      didPush = true
+    } else {
+      lastPushedModRef.current = modified
     }
 
-    // Re-resolve the selected line after external content change
+    // Re-resolve the selected line only after a genuine external content change
+    // (not on our own echo — that would needlessly reset the shared scroll).
+    if (!didPush) return
     const id = window.setTimeout(() => {
       const pos = editor.getOriginalEditor().getPosition()
       if (pos) resolveSelection('original', pos.lineNumber)
@@ -255,8 +264,8 @@ export function DiffEditorPanel({
           <DiffEditor
             height="100%"
             language={language}
-            original={original}
-            modified={modified}
+            original={initialOrig}
+            modified={initialMod}
             keepCurrentOriginalModel={true}
             keepCurrentModifiedModel={true}
             theme={theme}
