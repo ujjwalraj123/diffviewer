@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import { useMonacoTheme } from '../hooks/useMonacoTheme'
+import { CopyButton } from './CopyButton'
 
 interface TextEditorPairProps {
   language: string
@@ -42,7 +43,10 @@ export function TextEditorPair({
       <div className="pane">
         <div className="pane-header">
           <span>Original</span>
-          <span className="tag">{left.length} ch</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="tag">{left.length} ch</span>
+            <CopyButton text={left} dark={dark} />
+          </div>
         </div>
         <div className="pane-body">
           <Editor
@@ -62,7 +66,10 @@ export function TextEditorPair({
       <div className="pane">
         <div className="pane-header">
           <span>Modified</span>
-          <span className="tag">{right.length} ch</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="tag">{right.length} ch</span>
+            <CopyButton text={right} dark={dark} />
+          </div>
         </div>
         <div className="pane-body">
           <Editor

@@ -1,59 +1,79 @@
 /**
  * useSharedScroll
  *
- * Wires ONE external scrollbar div to drive the scrollLeft of two
- * "content" row divs simultaneously.
+ * Synchronises horizontal scroll across:
+ *   • origTextarea  — the original selected-line textarea
+ *   • modTextarea   — the modified selected-line textarea
+ *   • scrollbarDiv  — the single shared scrollbar at the bottom
  *
- * The content rows must have  overflow: hidden  — they never scroll on their
- * own; only the shared scrollbar moves them.
+ * Architecture (scroll SOURCE → targets):
+ *   User scrolls origTextarea  → scrollbarDiv + modTextarea follow
+ *   User scrolls modTextarea   → scrollbarDiv + origTextarea follow
+ *   User drags scrollbarDiv    → origTextarea + modTextarea follow
  *
- * A phantom <div> inside the scrollbar is resized to
- *   max(origRow.scrollWidth, modRow.scrollWidth)
- * so the scrollbar thumb reflects the true content width.
+ * The scrollbar's phantom spacer is sized to
+ *   max(origTextarea.scrollWidth, modTextarea.scrollWidth)
+ * so the thumb accurately represents the content width.
+ *
+ * Guards prevent echo loops (A fires → sets B → B fires → sets A → …).
  */
 
 import { useEffect } from 'react'
 import type React from 'react'
 
 export function useSharedScroll(
-  scrollbarRef: React.RefObject<HTMLDivElement | null>,
-  origRowRef:   React.RefObject<HTMLDivElement | null>,
-  modRowRef:    React.RefObject<HTMLDivElement | null>,
-  /** Re-run spacer sizing whenever either text changes */
+  scrollbarRef:    React.RefObject<HTMLDivElement      | null>,
+  origTextareaRef: React.RefObject<HTMLTextAreaElement | null>,
+  modTextareaRef:  React.RefObject<HTMLTextAreaElement | null>,
   origText: string,
   modText:  string,
 ) {
-  // ── Resize phantom spacer whenever content changes ──────────────────────────
+  // ── Resize phantom spacer whenever text changes ─────────────────────────────
   useEffect(() => {
-    const bar     = scrollbarRef.current
-    const origRow = origRowRef.current
-    const modRow  = modRowRef.current
-    if (!bar || !origRow || !modRow) return
+    const bar  = scrollbarRef.current
+    const orig = origTextareaRef.current
+    const mod  = modTextareaRef.current
+    if (!bar || !orig || !mod) return
 
     const spacer = bar.firstElementChild as HTMLElement | null
     if (!spacer) return
 
-    // Use rAF so the DOM has painted the new text before we measure
     const raf = requestAnimationFrame(() => {
-      const w = Math.max(origRow.scrollWidth, modRow.scrollWidth)
+      const w = Math.max(orig.scrollWidth, mod.scrollWidth)
       spacer.style.width = `${w}px`
     })
-
     return () => cancelAnimationFrame(raf)
-  }, [origText, modText, scrollbarRef, origRowRef, modRowRef])
+  }, [origText, modText, scrollbarRef, origTextareaRef, modTextareaRef])
 
-  // ── Propagate scroll position: scrollbar → both rows ───────────────────────
+  // ── Wire scroll events ──────────────────────────────────────────────────────
   useEffect(() => {
-    const bar = scrollbarRef.current
-    if (!bar) return
+    const bar  = scrollbarRef.current
+    const orig = origTextareaRef.current
+    const mod  = modTextareaRef.current
+    if (!bar || !orig || !mod) return
 
-    const onScroll = () => {
-      const sl = bar.scrollLeft
-      if (origRowRef.current) origRowRef.current.scrollLeft = sl
-      if (modRowRef.current)  modRowRef.current.scrollLeft  = sl
+    let syncing = false   // re-entrancy guard
+
+    const syncFrom = (source: HTMLElement, ...targets: HTMLElement[]) => {
+      if (syncing) return
+      syncing = true
+      const sl = source.scrollLeft
+      for (const t of targets) t.scrollLeft = sl
+      syncing = false
     }
 
-    bar.addEventListener('scroll', onScroll, { passive: true })
-    return () => bar.removeEventListener('scroll', onScroll)
-  }, [scrollbarRef, origRowRef, modRowRef])
+    const onOrig = () => syncFrom(orig, mod, bar)
+    const onMod  = () => syncFrom(mod,  orig, bar)
+    const onBar  = () => syncFrom(bar,  orig, mod)
+
+    orig.addEventListener('scroll', onOrig, { passive: true })
+    mod.addEventListener('scroll',  onMod,  { passive: true })
+    bar.addEventListener('scroll',  onBar,  { passive: true })
+
+    return () => {
+      orig.removeEventListener('scroll', onOrig)
+      mod.removeEventListener('scroll',  onMod)
+      bar.removeEventListener('scroll',  onBar)
+    }
+  }, [scrollbarRef, origTextareaRef, modTextareaRef])
 }

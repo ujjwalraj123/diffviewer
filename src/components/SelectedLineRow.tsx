@@ -1,110 +1,82 @@
 /**
  * SelectedLineRow
  *
- * One of the two "selected line" panels that sit below the main DiffEditor.
- * Renders a sub-header (label + line number) and a single content row whose
- * scrollLeft is driven externally by the shared scrollbar — it never scrolls
- * on its own (overflow: hidden).
+ * Editable single-line panel that sits below the main DiffEditor.
  *
- * A copy button in the header copies the raw line text to the clipboard.
- * It shows a brief "✓" tick for 1.5 s after a successful copy.
+ * Features:
+ *  • Editable via a <textarea> (single-row, no wrap, horizontal scroll)
+ *  • Word-level diff highlights rendered as a background overlay layer
+ *    (the classic "highlight backdrop + transparent textarea on top" pattern)
+ *  • Copy button in the sub-header
+ *  • scrollLeft driven externally by the shared scrollbar
+ *
+ * The highlight layer and the textarea share identical font/size/padding so
+ * the highlight spans land exactly under the right characters.
  */
 
-import { useState, useCallback, type CSSProperties } from 'react'
+import { useRef, useEffect, type CSSProperties } from 'react'
+import { wordDiff } from '../lib/wordDiff'
+import { CopyButton } from './CopyButton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SelectedLineRowProps {
-  label:  string
-  lineNo: number | null   // null = no corresponding line on this side
-  text:   string
-  dark:   boolean
-  rowRef: React.RefObject<HTMLDivElement | null>
+  label:        string
+  side:         'original' | 'modified'
+  lineNo:       number | null
+  text:         string
+  peerText:     string
+  dark:         boolean
+  /** Ref forwarded to the <textarea> — used by useSharedScroll */
+  textareaRef:  React.RefObject<HTMLTextAreaElement | null>
+  onChange:     (newText: string) => void
 }
 
-// ─── Shared monospace style ───────────────────────────────────────────────────
+// ─── Shared text style (must be identical on highlight layer + textarea) ──────
 
-const MONO: CSSProperties = {
+const MONO_STYLE: CSSProperties = {
   fontFamily: "'ui-monospace','SFMono-Regular','SF Mono',Menlo,Consolas,monospace",
   fontSize: 13,
   lineHeight: '22px',
+  letterSpacing: 0,
   whiteSpace: 'pre',
-  overflow: 'hidden',
+  wordBreak: 'normal',
+  overflowWrap: 'normal',
 }
 
-// ─── CopyButton ───────────────────────────────────────────────────────────────
+// ─── Highlight colours ────────────────────────────────────────────────────────
 
-function CopyButton({ text, dark }: { text: string; dark: boolean }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = useCallback(async () => {
-    if (!text) return
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // Clipboard API unavailable — silent fail
-    }
-  }, [text])
-
-  const muted   = dark ? '#8B949E' : '#6B7280'
-  const hover   = dark ? '#58A6FF' : '#126BCF'
-  const border  = dark ? '#30363D' : '#D8DCE3'
-  const bg      = dark ? '#161B22' : '#F4F6FA'
-
-  return (
-    <button
-      onClick={handleCopy}
-      disabled={!text}
-      title={copied ? 'Copied!' : 'Copy line'}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '2px 7px',
-        border: `1px solid ${border}`,
-        borderRadius: 4,
-        background: bg,
-        color: copied ? hover : muted,
-        fontFamily: 'inherit',
-        fontSize: 11,
-        fontWeight: 500,
-        cursor: text ? 'pointer' : 'default',
-        opacity: text ? 1 : 0.35,
-        transition: 'color 0.15s, border-color 0.15s',
-        userSelect: 'none',
-        flexShrink: 0,
-      }}
-      onMouseEnter={e => { if (text) (e.currentTarget as HTMLButtonElement).style.color = hover }}
-      onMouseLeave={e => { if (!copied) (e.currentTarget as HTMLButtonElement).style.color = muted }}
-    >
-      {copied ? (
-        // Tick icon
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="2 6 5 9 10 3" />
-        </svg>
-      ) : (
-        // Copy icon
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="4" width="7" height="7" rx="1" />
-          <path d="M2 8V2a1 1 0 0 1 1-1h6" />
-        </svg>
-      )}
-      {copied ? 'Copied' : 'Copy'}
-    </button>
-  )
+function highlightBg(kind: 'delete' | 'insert', dark: boolean): string {
+  if (kind === 'delete') return dark ? 'rgba(248,81,73,0.30)' : 'rgba(220,38,38,0.15)'
+  return dark ? 'rgba(63,185,80,0.28)' : 'rgba(10,123,62,0.13)'
 }
 
 // ─── SelectedLineRow ──────────────────────────────────────────────────────────
 
-export function SelectedLineRow({ label, lineNo, text, dark, rowRef }: SelectedLineRowProps) {
+export function SelectedLineRow({
+  label, side, lineNo, text, peerText, dark, textareaRef, onChange,
+}: SelectedLineRowProps) {
   const headerBg  = dark ? '#161B22' : '#F4F6FA'
   const headerClr = dark ? '#8B949E' : '#6B7280'
   const bodyBg    = dark ? '#0D1117' : '#FFFFFF'
   const inkClr    = dark ? '#E6EDF3' : '#16181D'
   const numClr    = dark ? '#484F58' : '#9CA3AF'
   const borderClr = dark ? '#30363D' : '#D8DCE3'
+
+  // Gutter width: fixed 52px (line-number + right-padding)
+  const GUTTER = 52
+
+  // Sync the highlight layer's scrollLeft to match the textarea whenever
+  // the textarea scrolls — so highlights stay aligned with visible text.
+  const highlightRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const ta = textareaRef.current
+    const hl = highlightRef.current
+    if (!ta || !hl) return
+    const onScroll = () => { hl.scrollLeft = ta.scrollLeft }
+    ta.addEventListener('scroll', onScroll, { passive: true })
+    return () => ta.removeEventListener('scroll', onScroll)
+  }, [textareaRef])
 
   return (
     <div style={{ borderTop: `1px solid ${borderClr}` }}>
@@ -119,7 +91,6 @@ export function SelectedLineRow({ label, lineNo, text, dark, rowRef }: SelectedL
         borderBottom: `1px solid ${borderClr}`,
         userSelect: 'none',
       }}>
-        {/* Left: label + line number */}
         <span style={{
           fontSize: 11,
           fontWeight: 600,
@@ -138,34 +109,105 @@ export function SelectedLineRow({ label, lineNo, text, dark, rowRef }: SelectedL
             </span>
           )}
         </span>
-
-        {/* Right: copy button */}
         <CopyButton text={text} dark={dark} />
       </div>
 
-      {/* ── Content row — scrollLeft driven by shared scrollbar ── */}
-      <div
-        ref={rowRef}
-        style={{
-          background: bodyBg,
-          padding: '6px 0',
-          overflow: 'hidden',   // ← intentional; shared scrollbar drives this
-        }}
-      >
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'baseline',
+      {/* ── Content row ── */}
+      <div style={{
+        position: 'relative',
+        background: bodyBg,
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+        {/* Line-number gutter — sticky left, always visible */}
+        <span style={{
+          ...MONO_STYLE,
+          flexShrink: 0,
+          width: GUTTER,
           paddingLeft: 12,
-          paddingRight: 24,
+          paddingTop: 6,
+          paddingBottom: 6,
+          textAlign: 'right',
+          paddingRight: 16,
+          color: numClr,
+          userSelect: 'none',
+          zIndex: 2,
+          background: bodyBg,
         }}>
-          {/* Gutter */}
-          <span style={{ ...MONO, color: numClr, minWidth: 36, textAlign: 'right', paddingRight: 16, flexShrink: 0 }}>
-            {lineNo ?? '·'}
-          </span>
-          {/* Content */}
-          <span style={{ ...MONO, color: inkClr }}>
-            {lineNo === null ? '' : (text || '\u00A0')}
-          </span>
+          {lineNo ?? '·'}
+        </span>
+
+        {/* Highlight + textarea wrapper */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+
+          {/* Highlight layer — scrolls in sync with textarea via the effect above */}
+          {lineNo !== null && (
+            <div
+              ref={highlightRef}
+              aria-hidden
+              style={{
+                ...MONO_STYLE,
+                position: 'absolute',
+                inset: 0,
+                paddingLeft: 0,
+                paddingRight: 24,
+                paddingTop: 6,
+                paddingBottom: 6,
+                pointerEvents: 'none',
+                color: 'transparent',
+                overflowX: 'hidden',
+                overflowY: 'hidden',
+              }}
+            >
+              {wordDiff(
+                side === 'original' ? text : peerText,
+                side === 'modified'  ? text : peerText,
+                side,
+              ).map((t, i) =>
+                t.kind === 'equal' ? (
+                  <span key={i}>{t.text}</span>
+                ) : (
+                  <mark key={i} style={{
+                    background: highlightBg(t.kind, dark),
+                    color: 'transparent',
+                    borderRadius: 2,
+                  }}>
+                    {t.text}
+                  </mark>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Editable textarea — this IS the scroll source */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={lineNo === null ? '' : text}
+            disabled={lineNo === null}
+            onChange={e => onChange(e.target.value)}
+            spellCheck={false}
+            style={{
+              ...MONO_STYLE,
+              position: 'relative',
+              zIndex: 1,
+              display: 'block',
+              width: '100%',
+              padding: '6px 24px 6px 0',
+              margin: 0,
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              background: 'transparent',
+              color: inkClr,
+              caretColor: inkClr,
+              overflowX: 'auto',   // ← textarea scrolls freely
+              overflowY: 'hidden',
+              height: 34,
+              minHeight: 34,
+              maxHeight: 34,
+            }}
+          />
         </div>
       </div>
 
