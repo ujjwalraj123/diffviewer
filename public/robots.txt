@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://diffviewer.vercel.app/sitemap.xml
+Sitemap: https://diffviewer-weld.vercel.app/sitemap.xml

@@ -1,6 +1,6 @@
 export const SITE = {
   name: 'DiffViewer',
-  url: 'https://diffviewer.vercel.app',
+  url: 'https://diffviewer-weld.vercel.app',
   image: '/og-image.png',
   defaultTitle: 'Online Diff Checker – Compare Text & Code Side by Side | DiffViewer',
   defaultDescription:
