@@ -1,148 +1,95 @@
-# Diff Viewer
+# DiffViewer — Free Online Diff Checker
 
-A fast, modern, privacy-focused **online code and text diff viewer** built with **React, TypeScript, Vite, and Monaco Editor**.
+Compare two pieces of text or code side by side with line-level and word-level highlighting. Built with React, TypeScript, Vite and Monaco Editor.
 
-Compare two pieces of code or text side by side, quickly identify changes, and review differences directly in your browser.
+**Live:** <vercel-Live-Link>
 
-## ✨ Features
+## Features
 
-* 🔍 **Side-by-side diff comparison**
-* 📝 **Monaco Editor** for a powerful code-editing experience
-* ⚡ **Fast and lightweight** React + Vite frontend
-* 🎨 **Syntax highlighting** for code comparison
-* 📱 **Responsive interface** for different screen sizes
-* 🔒 **Privacy-focused** — comparison can be performed directly in the browser
-* 📋 Easy copy and paste workflow
-* 🚀 Fast production builds
-* 🌐 Designed for use as an online developer tool
+- Side-by-side diff with Monaco Editor
+- Word-level highlighting for the selected line, editable in place
+- Syntax highlighting for 15 languages (JS, TS, JSON, HTML, CSS, Python, SQL and more)
+- Light and dark themes (remembers your choice)
+- Comparison runs in your browser; your text is not uploaded
+- Responsive layout (desktop, tablet, mobile)
+- Built-in blog with per-page SEO
 
-## 🎯 Use Cases
+## Tech stack
 
-Diff Viewer can be used to compare:
+React 19 · TypeScript · Vite · Monaco Editor · Vercel
 
-* Source code
-* Configuration files
-* JSON
-* JavaScript / TypeScript
-* HTML
-* CSS
-* Markdown
-* SQL
-* XML
-* Plain text
-* API responses
-* Configuration changes
-* Code revisions
-
-Whether you're debugging a change, reviewing a configuration file, comparing API responses, or checking two versions of source code, Diff Viewer provides a simple way to see exactly what changed.
-
-## 🛠️ Tech Stack
-
-* **React** — UI framework
-* **TypeScript** — Type-safe development
-* **Vite** — Development server and production bundler
-* **Monaco Editor** — Code editing and diff visualization
-* **ESLint** — Code quality and linting
-* **Vercel** — Production deployment
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Make sure you have Node.js and npm installed.
-
-### Installation
-
-Clone the repository and install the dependencies:
+## Getting started
 
 ```bash
 git clone https://github.com/ujjwalraj123/diffviewer.git
 cd diffviewer
 npm install
+npm run dev      # http://localhost:4319
 ```
 
-### Development
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Type-check and build to `dist/` |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
 
-Start the development server:
-
-```bash
-npm run dev
-```
-
-Vite will start the application locally. Open the URL displayed in your terminal to use the Diff Viewer.
-
-## 📦 Production Build
-
-Create an optimized production build:
-
-```bash
-npm run build
-```
-
-The production files are generated inside:
+## Project structure
 
 ```text
-dist/
+src/
+  components/   Toolbar, editors, copy button, links
+  pages/        ToolPage, BlogIndex, BlogPost, NotFound
+  content/      posts.ts  ← blog posts live here
+  config/       site.ts   ← site URL and default SEO text
+  hooks/        useSeo, useTheme, useMonacoTheme, useSharedScroll
+  lib/          router, wordDiff, lineMapping
+  styles/       global.css, app.css, blog.css
+public/         robots.txt, sitemap.xml, favicon.svg, og-image.png
 ```
 
-The build process performs TypeScript checking and creates the optimized Vite production bundle.
+## Routing
 
-### Preview Production Build
+This is a single-page app with a small History API router (`src/lib/router.ts`):
 
-To preview the production build locally:
+- `/` — diff tool
+- `/blog` — blog index
+- `/blog/:slug` — blog post
 
-```bash
-npm run preview
-```
+`vercel.json` rewrites all paths to `index.html` so deep links work on refresh.
 
-## 🧪 Code Quality
+## Adding a blog post
 
-Run ESLint with:
+1. Add an object to `POSTS` in `src/content/posts.ts` (slug, title, description, date, sections).
+2. Add its URL to `public/sitemap.xml`.
+3. Deploy. Title, meta description, canonical URL, Open Graph tags and `BlogPosting` JSON-LD are generated automatically by `useSeo`.
 
-```bash
-npm run lint
-```
+## SEO checklist
 
-For production applications, TypeScript-aware ESLint rules can be enabled to provide stronger type checking and code-quality validation.
+- [ ] Set your real domain in `src/config/site.ts`, `index.html`, `public/robots.txt` and `public/sitemap.xml`
+- [ ] Add `public/og-image.png` (1200×630) and `public/favicon.svg`
+- [ ] Submit `sitemap.xml` in Google Search Console and Bing Webmaster Tools
+- [ ] Keep one `<h1>` per page and unique titles/descriptions
 
-## 🔒 Privacy
-
-Diff Viewer is designed with privacy in mind.
-
-Code and text entered into the comparison interface can be processed directly in the browser rather than requiring the content to be uploaded to a server.
-
-**Do not enter sensitive information into any online tool unless you have verified how that particular deployment handles your data.**
-
-## 🌐 Deployment
-
-The project is designed to work well with **Vercel** and other static hosting platforms.
-
-For Vercel, the typical configuration is:
+## Deployment (Vercel)
 
 ```text
 Framework: Vite
-Build Command: npm run build
-Output Directory: dist
+Build command: npm run build
+Output directory: dist
 ```
 
-Vercel can automatically detect the Vite configuration when the project is connected to a repository.
+## Privacy
 
+Text you paste is compared locally in your browser. Note that Monaco Editor's code is loaded from a CDN by `@monaco-editor/react`, but your content is not sent anywhere. Even so, avoid pasting secrets into any online tool unless you trust the deployment.
 
-## 🤝 Contributing
+## Contributing
 
-Contributions, suggestions, and improvements are welcome.
+1. Create a branch
+2. Make your changes
+3. Run `npm run lint` and `npm run build`
+4. Open a pull request
 
-Before submitting changes:
+## License
 
-1. Create a branch for your changes.
-2. Make your changes.
-3. Run the linter.
-4. Run the production build.
-5. Test the application locally.
-6. Submit a pull request.
-
-## Built With
-
-**React · TypeScript · Vite · Monaco Editor**
-
-Built as a fast and privacy-focused developer tool for comparing code and text.
+Add your license here (for example MIT).

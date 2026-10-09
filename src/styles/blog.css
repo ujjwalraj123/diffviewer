@@ -1,0 +1,50 @@
+.site-logo { color: var(--ink); text-decoration: none; }
+.site-nav { display: flex; gap: 8px; align-items: center; }
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  color: var(--prose);
+  line-height: 1.7;
+  font-size: 16px;
+}
+.page h1 { color: var(--ink); font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.2; margin: 0 0 8px; }
+.page h2 { color: var(--ink); font-size: clamp(1.15rem, 3vw, 1.4rem); margin: 32px 0 8px; }
+.page a { color: var(--action); }
+.page p { margin: 0 0 14px; }
+.lead, .meta, .crumbs { color: var(--muted); font-size: 14px; }
+.crumbs { margin-bottom: 16px; }
+.meta { margin-bottom: 24px; }
+
+.cards { display: grid; gap: 14px; margin-top: 24px; }
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  background: var(--canvas);
+  transition: border-color 0.15s;
+}
+.card:hover { border-color: var(--action); }
+.card h2 { margin: 0 0 6px; font-size: 1.1rem; }
+.card h2 a { color: var(--ink); text-decoration: none; }
+.card p { margin: 0 0 8px; font-size: 14px; }
+.card small { color: var(--muted); }
+
+.cta {
+  margin: 36px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--chrome);
+}
+.cta p { margin: 0 0 10px; }
+.more { padding-left: 18px; margin: 0; }
+
+@media (min-width: 720px) {
+  .cards { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .page { padding: 20px 16px 48px; font-size: 15px; }
+  .site-nav .btn { padding: 5px 8px; }
+}

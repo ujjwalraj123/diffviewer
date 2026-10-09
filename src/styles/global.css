@@ -108,4 +108,9 @@ body {
 .seg .btn { border: none; border-radius: 0; }
 .seg .btn + .btn { border-left: 1px solid var(--border); }
 
-/* (theme toggle is now a plain .btn icon button — no extra CSS needed) */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+a.btn { text-decoration: none; }
+.loading { padding: 24px; color: var(--muted); font-size: 13px; }

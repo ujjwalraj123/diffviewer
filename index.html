@@ -3,11 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DiffViewer</title>
+    <title>Online Diff Checker – Compare Text & Code Side by Side | DiffViewer</title>
+    <meta name="description" content="Free online diff checker. Compare two texts or code files side by side with line and word-level highlighting. Runs in your browser — nothing is uploaded." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://diffviewer.vercel.app/" />
+    <meta name="theme-color" content="#126BCF" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DiffViewer" />
+    <meta property="og:title" content="Online Diff Checker – Compare Text & Code Side by Side" />
+    <meta property="og:description" content="Free, private diff checker with word-level highlighting. Runs entirely in your browser." />
+    <meta property="og:url" content="https://diffviewer.vercel.app/" />
+    <meta property="og:image" content="https://diffviewer.vercel.app/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Online Diff Checker – DiffViewer" />
+    <meta name="twitter:description" content="Compare text and code side by side. Free and private." />
+    <meta name="twitter:image" content="https://diffviewer.vercel.app/og-image.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "DiffViewer",
+      "url": "https://diffviewer.vercel.app/",
+      "description": "Free online diff checker to compare text and code side by side.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>DiffViewer – Online Diff Checker</h1>
+      <p>Compare two pieces of text or code side by side with line and word-level highlighting. Please enable JavaScript to use the tool.</p>
+      <a href="/blog">Read the blog</a>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
