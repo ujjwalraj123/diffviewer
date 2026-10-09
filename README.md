@@ -2,7 +2,7 @@
 
 Compare two pieces of text or code side by side with line-level and word-level highlighting. Built with React, TypeScript, Vite and Monaco Editor.
 
-**Live:** <vercel-Live-Link>
+**[Live](https://diffviewer-weld.vercel.app/)**
 
 ## Features
 
@@ -89,7 +89,3 @@ Text you paste is compared locally in your browser. Note that Monaco Editor's co
 2. Make your changes
 3. Run `npm run lint` and `npm run build`
 4. Open a pull request
-
-## License
-
-Add your license here (for example MIT).
