@@ -16,15 +16,33 @@ export default function BlogPost({ post }: { post: Post }) {
     type: 'article',
     jsonLd: {
       '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      headline: post.title,
-      description: post.description,
-      datePublished: post.date,
-      dateModified: post.date,
-      image: SITE.url + SITE.image,
-      mainEntityOfPage: SITE.url + path,
-      author: { '@type': 'Organization', name: SITE.name },
-      publisher: { '@type': 'Organization', name: SITE.name },
+      '@graph': [
+        {
+          '@type': 'BlogPosting',
+          headline: post.title,
+          description: post.description,
+          datePublished: post.date,
+          dateModified: post.date,
+          image: SITE.url + SITE.image,
+          mainEntityOfPage: SITE.url + path,
+          wordCount: post.sections.reduce((n, s) => n + s.body.join(' ').split(/\s+/).length, 0),
+          author: { '@type': 'Organization', name: SITE.name, url: SITE.url },
+          publisher: {
+            '@type': 'Organization',
+            name: SITE.name,
+            url: SITE.url,
+            logo: { '@type': 'ImageObject', url: SITE.url + SITE.image },
+          },
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url + '/' },
+            { '@type': 'ListItem', position: 2, name: 'Blog', item: SITE.url + '/blog' },
+            { '@type': 'ListItem', position: 3, name: post.title, item: SITE.url + path },
+          ],
+        },
+      ],
     },
   })
 

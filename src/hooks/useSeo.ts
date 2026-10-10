@@ -8,6 +8,8 @@ interface SeoProps {
   type?: 'website' | 'article'
   noindex?: boolean
   jsonLd?: object
+  image?: string
+  imageAlt?: string
 }
 
 function setMeta(attr: 'name' | 'property', key: string, content: string) {
@@ -20,10 +22,12 @@ function setMeta(attr: 'name' | 'property', key: string, content: string) {
   el.setAttribute('content', content)
 }
 
-export function useSeo({ title, description, path, type = 'website', noindex, jsonLd }: SeoProps) {
+export function useSeo({ title, description, path, type = 'website', noindex, jsonLd, image, imageAlt }: SeoProps) {
   const ld = jsonLd ? JSON.stringify(jsonLd) : ''
   useEffect(() => {
     const url = SITE.url + (path === '/' ? '/' : path)
+    const imageUrl = SITE.url + (image ?? SITE.image)
+    const alt = imageAlt ?? SITE.imageAlt
     document.title = title
     setMeta('name', 'description', description)
     setMeta('name', 'robots', noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large')
@@ -31,9 +35,13 @@ export function useSeo({ title, description, path, type = 'website', noindex, js
     setMeta('property', 'og:description', description)
     setMeta('property', 'og:url', url)
     setMeta('property', 'og:type', type)
-    setMeta('property', 'og:image', SITE.url + SITE.image)
+    setMeta('property', 'og:image', imageUrl)
+    setMeta('property', 'og:image:alt', alt)
+    setMeta('name', 'twitter:card', 'summary_large_image')
     setMeta('name', 'twitter:title', title)
     setMeta('name', 'twitter:description', description)
+    setMeta('name', 'twitter:image', imageUrl)
+    setMeta('name', 'twitter:image:alt', alt)
 
     let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')
     if (!link) {
@@ -52,5 +60,5 @@ export function useSeo({ title, description, path, type = 'website', noindex, js
       s.text = ld
       document.head.appendChild(s)
     }
-  }, [title, description, path, type, noindex, ld])
+  }, [title, description, path, type, noindex, ld, image, imageAlt])
 }

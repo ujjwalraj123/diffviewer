@@ -75,3 +75,17 @@
   .toolbar-label { display: none; }
   .toolbar { gap: 6px; padding: 0 8px; }
 }
+
+/* ── Crawlable SEO content: available to search engines & screen readers,
+   kept out of the full-viewport tool UI (not display:none, so it is indexed). ── */
+.seo-content {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

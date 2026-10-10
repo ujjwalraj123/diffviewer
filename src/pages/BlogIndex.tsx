@@ -1,6 +1,7 @@
 import { SiteHeader } from './SiteHeader'
 import { Link } from '../components/Link'
 import { POSTS } from '../content/posts'
+import { SITE } from '../config/site'
 import { useSeo } from '../hooks/useSeo'
 import { useTheme } from '../hooks/useTheme'
 
@@ -10,6 +11,31 @@ export default function BlogIndex() {
     title: 'Blog – Diff Tips, Text & Code Comparison Guides | DiffViewer',
     description: 'Guides on comparing text, code, JSON and config files, and getting the most out of a diff checker.',
     path: '/blog',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Blog',
+          name: 'DiffViewer Blog',
+          url: SITE.url + '/blog',
+          description: 'Guides on comparing text, code, JSON and config files, and getting the most out of a diff checker.',
+          blogPost: POSTS.map(p => ({
+            '@type': 'BlogPosting',
+            headline: p.title,
+            description: p.description,
+            datePublished: p.date,
+            url: SITE.url + '/blog/' + p.slug,
+          })),
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.url + '/' },
+            { '@type': 'ListItem', position: 2, name: 'Blog', item: SITE.url + '/blog' },
+          ],
+        },
+      ],
+    },
   })
 
   return (
