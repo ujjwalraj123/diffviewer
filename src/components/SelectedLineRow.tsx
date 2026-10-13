@@ -36,7 +36,7 @@ export interface SelectedLineRowProps {
 
 const LINE_HEIGHT = 22
 const V_PADDING = 6 // top + bottom padding (6px each) baked into the 34px row
-
+const SCROLLBAR_H = 10
 const MONO_STYLE: CSSProperties = {
   fontFamily: "'ui-monospace','SFMono-Regular','SF Mono',Menlo,Consolas,monospace",
   fontSize: 13,
@@ -69,11 +69,14 @@ export function SelectedLineRow({
   // Gutter width: fixed 52px (line-number + right-padding)
   const GUTTER = 52
 
-  // Grow the row to fit multi-line content instead of collapsing to one line.
+    // Grow the row to fit multi-line content instead of collapsing to one line.
   // Monaco lines never contain '\n', but a user can paste/type newlines here,
   // and we must show them rather than silently clipping to the first line.
   const lineCount = lineNo === null ? 1 : Math.max(1, text.split('\n').length)
-  const rowHeight = lineCount * LINE_HEIGHT + V_PADDING * 2
+  const contentHeight = lineCount * LINE_HEIGHT + V_PADDING * 2
+  // Textarea (and therefore the whole row) is SCROLLBAR_H taller than the text
+  // so the thin horizontal scrollbar gets its own space instead of overlapping.
+  const rowHeight = contentHeight + SCROLLBAR_H
 
   // Sync the highlight layer's scrollLeft to match the textarea whenever
   // the textarea scrolls — so highlights stay aligned with visible text.
@@ -191,9 +194,9 @@ export function SelectedLineRow({
             </div>
           )}
 
-          {/* Editable textarea — this IS the scroll source */}
-          <textarea
+                    <textarea
             ref={textareaRef}
+            className="thin-scroll"
             rows={lineCount}
             value={lineNo === null ? '' : text}
             disabled={lineNo === null}
@@ -215,8 +218,6 @@ export function SelectedLineRow({
               caretColor: inkClr,
               overflowX: 'auto',   // ← textarea scrolls freely
               overflowY: 'hidden',
-              // Grow vertically with the content (multi-line) instead of being
-              // pinned to one row, which previously clipped to a single line.
               height: rowHeight,
               minHeight: rowHeight,
               maxHeight: rowHeight,

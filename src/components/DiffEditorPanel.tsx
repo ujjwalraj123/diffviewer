@@ -338,11 +338,12 @@ export function DiffEditorPanel({
         {/* ── 4. ONE shared horizontal scrollbar ── */}
         <div
           ref={scrollbarRef}
+          className="thin-scroll"
           style={{
             overflowX: 'auto',
             overflowY: 'hidden',
             borderTop: `1px solid ${borderClr}`,
-            height: 14,
+            height: 10,
             flexShrink: 0,
           }}
         >
