@@ -159,6 +159,18 @@ function attachCharSegments(lines: ParsedLine[]) {
   }
 }
 
+/**
+ * Normalize text before diffing so that cosmetic-only differences that users
+ * never intend to see as "changes" are ignored:
+ *  - Convert CRLF / CR line endings to LF (pasting often injects \r\n).
+ *  - Strip a single trailing newline so "foo" and "foo\n" are treated equal.
+ * This prevents the diff viewer from reporting every line as changed when the
+ * two inputs are effectively identical.
+ */
+function normalizeForDiff(text: string): string {
+  return text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+}
+
 function computeDiff(
   oldContent: string,
   newContent: string,
@@ -168,7 +180,10 @@ function computeDiff(
   additions: number;
   deletions: number;
 } {
-  const changes = diffLines(oldContent, newContent);
+  const changes = diffLines(
+    normalizeForDiff(oldContent),
+    normalizeForDiff(newContent),
+  );
   const lines: ParsedLine[] = [];
   let oldLine = 1;
   let newLine = 1;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { TextEditorPair } from "../components/TextEditorPair";
+import { CopyButton } from "../components/CopyButton";
 import { DiffViewer } from "@/components/ui/diff-viewer";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
@@ -35,6 +36,8 @@ greet("there", "Hi");
 export default function ToolPage() {
   const [mode, setMode] = useState<"edit" | "diff">("edit");
   const [diffViewMode, setDiffViewMode] = useState<"split" | "unified">("split");
+  // When true, the diff view becomes editable in place (Diff Editor action).
+  const [diffEditable, setDiffEditable] = useState(false);
   const [left, setLeft] = useState("");
   const [right, setRight] = useState("");
   const { dark, toggle } = useTheme();
@@ -112,7 +115,15 @@ export default function ToolPage() {
   };
   */
 
-  const isIdentical = left === right && left.length > 0;
+  // Treat inputs as identical when they only differ by line-ending style
+  // (CRLF vs LF) or a single trailing newline — these are cosmetic and should
+  // not be reported as differences (matches the diff viewer's normalization).
+  const normalizeForCompare = (text: string) =>
+    text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+  const isIdentical =
+    left.length > 0 &&
+    right.length > 0 &&
+    normalizeForCompare(left) === normalizeForCompare(right);
   const isBothEmpty = left.trim().length === 0 && right.trim().length === 0;
 
   return (
@@ -125,6 +136,8 @@ export default function ToolPage() {
       onSwap={handleSwap}
       // onResetSample={handleResetSample}
       onEnterDiff={markEnteredDiff}
+      diffEditable={diffEditable}
+      onToggleDiffEditable={() => setDiffEditable((v) => !v)}
       dark={dark}
       onToggleDark={toggle}
     >
@@ -208,7 +221,49 @@ export default function ToolPage() {
             />
           ) : (
             <div className="flex-1 p-4 md:p-6 flex flex-col gap-4">
-              {isBothEmpty ? (
+              {diffEditable ? (
+                <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+                  {/* Original (editable) */}
+                  <div className="flex flex-col flex-1 min-w-0 rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
+                    <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/30 border-b border-border/60 text-xs font-medium">
+                      <div className="flex items-center gap-2">
+                        <Edit3 className="size-3.5 text-muted-foreground" />
+                        <span className="font-semibold text-foreground tracking-tight">
+                          Original
+                        </span>
+                      </div>
+                      <CopyButton text={left} />
+                    </div>
+                    <textarea
+                      value={left}
+                      onChange={(e) => setLeft(e.target.value)}
+                      spellCheck={false}
+                      placeholder="Original text…"
+                      className="flex-1 min-h-[240px] w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+
+                  {/* Modified (editable) */}
+                  <div className="flex flex-col flex-1 min-w-0 rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
+                    <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/30 border-b border-border/60 text-xs font-medium">
+                      <div className="flex items-center gap-2">
+                        <Edit3 className="size-3.5 text-muted-foreground" />
+                        <span className="font-semibold text-foreground tracking-tight">
+                          Modified
+                        </span>
+                      </div>
+                      <CopyButton text={right} />
+                    </div>
+                    <textarea
+                      value={right}
+                      onChange={(e) => setRight(e.target.value)}
+                      spellCheck={false}
+                      placeholder="Modified text…"
+                      className="flex-1 min-h-[240px] w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+                </div>
+              ) : isBothEmpty ? (
                 <div className="p-12 text-center rounded-xl border border-dashed border-border bg-card/40 flex flex-col items-center justify-center gap-3">
                   <Info className="size-8 text-muted-foreground" />
                   <div className="font-semibold text-foreground text-sm">

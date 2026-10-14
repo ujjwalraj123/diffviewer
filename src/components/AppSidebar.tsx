@@ -27,6 +27,8 @@ export interface AppSidebarProps {
   onSwap?: () => void;
   onResetSample?: () => void;
   onEnterDiff?: () => void;
+  diffEditable?: boolean;
+  onToggleDiffEditable?: () => void;
   dark: boolean;
   onToggleDark: () => void;
 }
@@ -40,6 +42,8 @@ export function AppSidebar({
   onSwap,
   onResetSample,
   onEnterDiff,
+  diffEditable = false,
+  onToggleDiffEditable,
   dark = false,
   onToggleDark,
 }: AppSidebarProps) {
@@ -270,6 +274,33 @@ export function AppSidebar({
                   Actions
                 </div>
                 <div className="space-y-1">
+                  {mode === "diff" && onToggleDiffEditable && (
+                    <button
+                      type="button"
+                      onClick={onToggleDiffEditable}
+                      aria-pressed={diffEditable}
+                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        diffEditable
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Edit3 className="size-3.5" />
+                        <span>Diff Editor</span>
+                      </span>
+                      <span
+                        className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                          diffEditable
+                            ? "bg-primary/15 border-primary/30 text-primary"
+                            : "bg-sidebar-accent border-sidebar-border text-muted-foreground"
+                        }`}
+                      >
+                        {diffEditable ? "On" : "Off"}
+                      </span>
+                    </button>
+                  )}
+
                   {onSwap && (
                     <button
                       type="button"
