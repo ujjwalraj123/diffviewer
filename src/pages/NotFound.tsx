@@ -5,7 +5,8 @@ import { useTheme } from '../hooks/useTheme'
 
 export default function NotFound() {
   const { dark, toggle } = useTheme()
-  useSeo({ title: 'Page not found | DiffViewer', description: 'This page does not exist.', path: '/404', noindex: true })
+  const path = typeof window === 'undefined' ? '/404' : window.location.pathname
+  useSeo({ title: 'Page not found | DiffViewer', description: 'This page does not exist.', path, noindex: true })
   return (
     <>
       <SiteHeader dark={dark} onToggleDark={toggle} />

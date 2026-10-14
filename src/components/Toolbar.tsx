@@ -1,5 +1,5 @@
 import { Link } from './Link'
-import {} from '../../public/favicon.svg'
+
 interface ToolbarProps {
   mode: 'edit' | 'diff'
   onModeChange: (mode: 'edit' | 'diff') => void
@@ -19,16 +19,16 @@ export function Toolbar({
   mode, onModeChange, language, onLanguageChange, onClear, dark, onToggleDark,
 }: ToolbarProps) {
   return (
-    <div className="toolbar">
-      <h1 className="sr-only">Online Diff Checker – Compare Text and Code Side by Side</h1>
-      <div className="mark">
+    <header className="toolbar">
+      <Link to="/" className="mark site-logo" aria-label="DiffViewer home">
         <img
-        src='/favicon.svg'
-        alt='diffViewer-logo'
-        width={16}
-        height={16}/>
+          src="/favicon.svg"
+          alt=""
+          width={16}
+          height={16}
+        />
         <span className="toolbar-label">DiffViewer</span>
-      </div>
+      </Link>
 
       <div className="divider" />
 
@@ -105,6 +105,6 @@ export function Toolbar({
           </svg>
         )}
       </button>
-    </div>
+    </header>
   )
 }

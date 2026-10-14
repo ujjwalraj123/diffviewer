@@ -37,6 +37,8 @@ export function useSeo({ title, description, path, type = 'website', noindex, js
     setMeta('property', 'og:type', type)
     setMeta('property', 'og:image', imageUrl)
     setMeta('property', 'og:image:alt', alt)
+    setMeta('property', 'og:image:width', '1200')
+    setMeta('property', 'og:image:height', '630')
     setMeta('name', 'twitter:card', 'summary_large_image')
     setMeta('name', 'twitter:title', title)
     setMeta('name', 'twitter:description', description)
@@ -60,5 +62,7 @@ export function useSeo({ title, description, path, type = 'website', noindex, js
       s.text = ld
       document.head.appendChild(s)
     }
+
+    return () => document.getElementById(id)?.remove()
   }, [title, description, path, type, noindex, ld, image, imageAlt])
 }
