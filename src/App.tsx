@@ -4,6 +4,7 @@ import { getPost } from './content/posts'
 import BlogIndex from './pages/BlogIndex'
 import BlogPost from './pages/BlogPost'
 import NotFound from './pages/NotFound'
+import FaqPage from './pages/FaqPage'
 import './styles/global.css'
 import './styles/app.css'
 import './styles/blog.css'
@@ -20,6 +21,7 @@ export default function App() {
       </Suspense>
     )
   }
+  if (path === '/faq') return <FaqPage />
   if (path === '/blog') return <BlogIndex />
   if (path.startsWith('/blog/')) {
     const post = getPost(path.slice('/blog/'.length))

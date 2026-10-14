@@ -11,6 +11,11 @@ export function useTheme() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+    if (dark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
     try { localStorage.setItem('dv-theme', dark ? 'dark' : 'light') } catch { /* ignore */ }
   }, [dark])
 
