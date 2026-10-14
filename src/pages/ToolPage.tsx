@@ -13,10 +13,9 @@ import {
   Rows3,
   CheckCircle2,
   HelpCircle,
-  FileCode2,
   Info,
 } from "lucide-react";
-
+/*
 const SAMPLE_LEFT = `function greet(name) {
   return "Hello, " + name;
 }
@@ -31,15 +30,16 @@ const SAMPLE_RIGHT = `function greet(name, greeting = "Hello") {
 greet("world");
 greet("there", "Hi");
 `;
+*/
 
 export default function ToolPage() {
   const [mode, setMode] = useState<"edit" | "diff">("edit");
   const [diffViewMode, setDiffViewMode] = useState<"split" | "unified">("split");
-  const [left, setLeft] = useState(SAMPLE_LEFT);
-  const [right, setRight] = useState(SAMPLE_RIGHT);
+  const [left, setLeft] = useState("");
+  const [right, setRight] = useState("");
   const { dark, toggle } = useTheme();
 
-  // Persistent workflow state: track if user has ever entered the Diff workflow
+  // Persistent workflow state
   const [hasEnteredDiff, setHasEnteredDiff] = useState<boolean>(() => {
     try {
       return localStorage.getItem("dv_has_entered_diff") === "true";
@@ -52,13 +52,14 @@ export default function ToolPage() {
     try {
       localStorage.setItem("dv_has_entered_diff", "true");
     } catch {
-      /* ignore */
+      // Ignore storage errors
     }
     setHasEnteredDiff(true);
   };
 
   const handleModeChange = (newMode: "edit" | "diff") => {
     setMode(newMode);
+
     if (newMode === "diff") {
       markEnteredDiff();
     }
@@ -103,10 +104,13 @@ export default function ToolPage() {
     setRight(left);
   };
 
+  
+  /*
   const handleResetSample = () => {
     setLeft(SAMPLE_LEFT);
     setRight(SAMPLE_RIGHT);
   };
+  */
 
   const isIdentical = left === right && left.length > 0;
   const isBothEmpty = left.trim().length === 0 && right.trim().length === 0;
@@ -119,26 +123,28 @@ export default function ToolPage() {
       onDiffViewModeChange={setDiffViewMode}
       onClear={handleClear}
       onSwap={handleSwap}
-      onResetSample={handleResetSample}
+      // onResetSample={handleResetSample}
       onEnterDiff={markEnteredDiff}
       dark={dark}
       onToggleDark={toggle}
     >
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Sub-header navigation & status bar */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs">
-          <div className="flex items-center gap-3">
+        {/* Sub-header navigation and status bar */}
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs">
+          {/* Desktop: Logo and title */}
+          <div className="hidden sm:flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <FileCode2 className="size-4 text-primary" />
+              {/* <FileCode2 className="size-4 text-primary" /> */}
               <h1 className="text-sm font-semibold text-foreground tracking-tight m-0">
                 Diff Workspace
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Mode Switcher Tabs */}
-            <div className="inline-flex items-center p-1 bg-muted rounded-lg border border-border/60">
+          {/* Mode switcher and responsive view controls */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            {/* Edit / Diff View tabs */}
+            <div className="inline-flex sm:hidden items-center p-1 bg-muted rounded-lg border border-border/60">
               <button
                 type="button"
                 onClick={() => handleModeChange("edit")}
@@ -165,39 +171,32 @@ export default function ToolPage() {
               </button>
             </div>
 
-            {/* Split / Unified toggle in diff mode */}
-            {mode === "diff" && (
-              <div className="hidden sm:inline-flex items-center p-1 bg-muted rounded-lg border border-border/60">
-                <button
-                  type="button"
-                  onClick={() => setDiffViewMode("split")}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                    diffViewMode === "split"
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Columns2 className="size-3.5" />
-                  <span>Split</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDiffViewMode("unified")}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                    diffViewMode === "unified"
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Rows3 className="size-3.5" />
-                  <span>Unified</span>
-                </button>
-              </div>
-            )}
+            {/* Mobile only: Split / Unified toggle */}
+            <div className="inline-flex sm:hidden items-center p-1 bg-muted rounded-lg border border-border/60">
+              <button
+                type="button"
+                onClick={() => setDiffViewMode("split")}
+                aria-pressed={diffViewMode === "split"}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${diffViewMode === "split"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Columns2 className="size-3.5" />
+                <span>Split</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDiffViewMode("unified")}
+                aria-pressed={diffViewMode === "unified"}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${diffViewMode === "unified"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Rows3 className="size-3.5" />
+                <span>Unified</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Main Work Area */}
+        {/* Main work area */}
         <div className="flex-1 flex flex-col min-h-0 bg-background">
           {mode === "edit" ? (
             <TextEditorPair
@@ -270,10 +269,7 @@ export default function ToolPage() {
           )}
         </div>
 
-        {/* Initial Visit FAQ Section:
-            Shown by default for first-time visitors in the main Diff Viewer area.
-            Once the user clicks Diff or enters the Diff workflow, this section is removed
-            from the main Diff Viewer area and accessible exclusively via the sidebar FAQ link. */}
+        {/* Initial visit FAQ section */}
         {!hasEnteredDiff && (
           <section
             aria-label="About DiffViewer and FAQs"
@@ -291,7 +287,7 @@ export default function ToolPage() {
                 </p>
               </div>
 
-              {/* FAQ Cards */}
+              {/* FAQ cards */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-foreground font-semibold text-base">
                   <HelpCircle className="size-4 text-primary" />

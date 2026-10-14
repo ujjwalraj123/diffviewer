@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Link } from './Link'
-import { usePath } from '../lib/router'
+import { useState } from "react";
+import { Link } from "./Link";
+import { usePath } from "../lib/router";
 import {
   GitCompare,
   BookOpen,
@@ -16,59 +16,65 @@ import {
   Menu,
   X,
   ShieldCheck,
-} from 'lucide-react'
+} from "lucide-react";
 
 export interface AppSidebarProps {
-  mode?: 'edit' | 'diff'
-  onModeChange?: (mode: 'edit' | 'diff') => void
-  diffViewMode?: 'split' | 'unified'
-  onDiffViewModeChange?: (mode: 'split' | 'unified') => void
-  onClear?: () => void
-  onSwap?: () => void
-  onResetSample?: () => void
-  onEnterDiff?: () => void
-  dark: boolean
-  onToggleDark: () => void
+  mode?: "edit" | "diff";
+  onModeChange?: (mode: "edit" | "diff") => void;
+  diffViewMode?: "split" | "unified";
+  onDiffViewModeChange?: (mode: "split" | "unified") => void;
+  onClear?: () => void;
+  onSwap?: () => void;
+  onResetSample?: () => void;
+  onEnterDiff?: () => void;
+  dark: boolean;
+  onToggleDark: () => void;
 }
 
 export function AppSidebar({
   mode,
   onModeChange,
-  diffViewMode = 'split',
+  diffViewMode = "split",
   onDiffViewModeChange,
   onClear,
   onSwap,
   onResetSample,
   onEnterDiff,
-  dark,
+  dark = false,
   onToggleDark,
 }: AppSidebarProps) {
-  const currentPath = usePath()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const currentPath = usePath();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isTool = currentPath === '/' || currentPath === ''
-  const isFaq = currentPath === '/faq'
-  const isBlog = currentPath.startsWith('/blog')
+  const isTool = currentPath === "/" || currentPath === "";
+  const isFaq = currentPath === "/faq";
+  const isBlog = currentPath.startsWith("/blog");
 
   const handleDiffClick = () => {
     try {
-      localStorage.setItem('dv_has_entered_diff', 'true')
+      localStorage.setItem("dv_has_entered_diff", "true");
     } catch {
       /* ignore */
     }
-    onEnterDiff?.()
-    setMobileOpen(false)
-  }
+    onEnterDiff?.();
+    setMobileOpen(false);
+  };
 
   return (
     <>
       {/* Mobile Top Header */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border sticky top-0 z-40">
-        <Link to="/" onClick={handleDiffClick} className="flex items-center gap-2.5 font-bold text-foreground">
+        <Link
+          to="/"
+          onClick={handleDiffClick}
+          className="flex items-center gap-2.5 font-bold text-foreground"
+        >
           <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
             <GitCompare className="size-4" />
           </div>
-          <span className="font-semibold text-base tracking-tight">DiffViewer</span>
+          <span className="font-semibold text-base tracking-tight">
+            DiffViewer
+          </span>
         </Link>
 
         <div className="flex items-center gap-2">
@@ -87,7 +93,11 @@ export function AppSidebar({
             aria-label="Toggle navigation menu"
             className="size-8 inline-flex items-center justify-center rounded-md border border-border bg-background text-foreground cursor-pointer"
           >
-            {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+            {mobileOpen ? (
+              <X className="size-4" />
+            ) : (
+              <Menu className="size-4" />
+            )}
           </button>
         </div>
       </header>
@@ -103,7 +113,7 @@ export function AppSidebar({
       {/* Main Sidebar (Desktop fixed left, mobile slide-over) */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-72 bg-sidebar border-r border-sidebar-border text-sidebar-foreground flex flex-col transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
-          mobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'
+          mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
@@ -144,8 +154,8 @@ export function AppSidebar({
                 onClick={handleDiffClick}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isTool
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 }`}
               >
                 <GitCompare className="size-4" />
@@ -157,8 +167,8 @@ export function AppSidebar({
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isFaq
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 }`}
               >
                 <HelpCircle className="size-4" />
@@ -170,8 +180,8 @@ export function AppSidebar({
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isBlog
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 }`}
               >
                 <BookOpen className="size-4" />
@@ -184,18 +194,18 @@ export function AppSidebar({
           {isTool && onModeChange && (
             <div className="space-y-4 pt-3 border-t border-sidebar-border/70">
               {/* Mode Switcher */}
-              <div>
+              <div className="hidden md:block ">
                 <label className="block px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   View Mode
                 </label>
                 <div className="grid grid-cols-2 gap-1 p-1 bg-sidebar-accent/60 rounded-lg border border-sidebar-border/60">
                   <button
                     type="button"
-                    onClick={() => onModeChange('edit')}
+                    onClick={() => onModeChange("edit")}
                     className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                      mode === 'edit'
-                        ? 'bg-background text-foreground shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
+                      mode === "edit"
+                        ? "bg-background text-foreground shadow-xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Edit3 className="size-3.5" />
@@ -204,13 +214,13 @@ export function AppSidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      onModeChange('diff')
-                      handleDiffClick()
+                      onModeChange("diff");
+                      handleDiffClick();
                     }}
                     className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                      mode === 'diff'
-                        ? 'bg-background text-foreground shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
+                      mode === "diff"
+                        ? "bg-background text-foreground shadow-xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <GitCompare className="size-3.5" />
@@ -220,19 +230,19 @@ export function AppSidebar({
               </div>
 
               {/* Diff Display Layout (Split vs Unified) */}
-              {mode === 'diff' && onDiffViewModeChange && (
-                <div>
+              {mode === "diff" && onDiffViewModeChange && (
+                <div className="hidden md:block">
                   <label className="block px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     Diff Layout
                   </label>
                   <div className="grid grid-cols-2 gap-1 p-1 bg-sidebar-accent/60 rounded-lg border border-sidebar-border/60">
                     <button
                       type="button"
-                      onClick={() => onDiffViewModeChange('split')}
+                      onClick={() => onDiffViewModeChange("split")}
                       className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                        diffViewMode === 'split'
-                          ? 'bg-background text-foreground shadow-xs font-semibold'
-                          : 'text-muted-foreground hover:text-foreground'
+                        diffViewMode === "split"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Columns2 className="size-3.5" />
@@ -240,11 +250,11 @@ export function AppSidebar({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDiffViewModeChange('unified')}
+                      onClick={() => onDiffViewModeChange("unified")}
                       className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                        diffViewMode === 'unified'
-                          ? 'bg-background text-foreground shadow-xs font-semibold'
-                          : 'text-muted-foreground hover:text-foreground'
+                        diffViewMode === "unified"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Rows3 className="size-3.5" />
@@ -313,15 +323,19 @@ export function AppSidebar({
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium bg-sidebar-accent/60 text-sidebar-foreground hover:bg-sidebar-accent border border-sidebar-border/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2">
-              {dark ? <Sun className="size-3.5 text-amber-400" /> : <Moon className="size-3.5 text-indigo-400" />}
-              <span>{dark ? 'Light Mode' : 'Dark Mode'}</span>
+              {dark ? (
+                <Sun className="size-3.5 text-amber-400" />
+              ) : (
+                <Moon className="size-3.5 text-indigo-400" />
+              )}
+              <span>{dark ? "Light Mode" : "Dark Mode"}</span>
             </div>
             <span className="text-[10px] text-muted-foreground uppercase font-mono">
-              {dark ? 'Dark' : 'Light'}
+              {dark ? "Dark" : "Light"}
             </span>
           </button>
         </div>
       </aside>
     </>
-  )
+  );
 }
