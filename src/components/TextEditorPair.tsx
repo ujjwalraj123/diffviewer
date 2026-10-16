@@ -144,7 +144,7 @@ function CodeEditorPane({
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
-          className="flex-1 p-3 bg-transparent text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-[20px] font-mono text-[13px] whitespace-pre overflow-auto"
+          className="flex-1 p-3 bg-transparent text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-[20px] font-mono text-[13px] whitespace-pre overflow-x-auto overflow-y-hidden"
         />
       </div>
     </div>

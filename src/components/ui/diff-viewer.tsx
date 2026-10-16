@@ -1,6 +1,15 @@
 "use client";
 
-import { type ComponentProps, useId, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { SyntaxHighlighterProps } from "@assistant-ui/react-markdown";
 import { cva, type VariantProps } from "class-variance-authority";
 import { diffLines, diffChars } from "diff";
@@ -11,6 +20,8 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
 type DiffLineType = "add" | "del" | "normal" | "marker";
+
+export type DiffEditableSide = "old" | "new";
 
 export interface DiffCharSegment {
   text: string;
@@ -731,6 +742,135 @@ function DiffViewerFileContent({
   );
 }
 
+interface DiffEditablePaneProps {
+  /** Which side of the diff this pane represents. */
+  side: DiffEditableSide;
+  /** The full text for this side (the source of truth / editable value). */
+  value: string;
+  /** The counterpart text, used to compute the character/line diff coloring. */
+  counterpart: string;
+  /** Called with the new full text whenever the user edits this pane. */
+  onChange: (next: string) => void;
+  placeholder?: string | undefined;
+}
+
+/**
+ * An editable pane that keeps the diff color-coding visible while the user
+ * types directly into it.
+ *
+ * Technique: a fully transparent <textarea> (visible caret, transparent text)
+ * is layered exactly on top of a read-only, color-coded rendering of the same
+ * text. Both layers share identical typography, padding and wrapping, so the
+ * caret and selection line up with the highlighted characters underneath.
+ */
+function DiffEditablePane({
+  side,
+  value,
+  counterpart,
+  onChange,
+  placeholder,
+}: DiffEditablePaneProps) {
+  const highlightRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const syncHighlight = useCallback(() => {
+    const textarea = textareaRef.current;
+    const highlight = highlightRef.current;
+    if (!textarea || !highlight) return;
+
+    highlight.style.width = `${Math.max(textarea.scrollWidth, textarea.clientWidth)}px`;
+    highlight.style.transform = `translateX(-${textarea.scrollLeft}px)`;
+  }, []);
+
+  // Compute per-line char segments for THIS side by diffing against the
+  // counterpart. We reuse computeDiff and then keep only the lines that belong
+  // to this side (old -> del/normal, new -> add/normal).
+  const lines = useMemo<ParsedLine[]>(() => {
+    const oldText = side === "old" ? value : counterpart;
+    const newText = side === "old" ? counterpart : value;
+    const { lines } = computeDiff(oldText, newText);
+    const keepType = side === "old" ? "del" : "add";
+    const picked = lines.filter(
+      (l) => l.type === keepType || l.type === "normal",
+    );
+
+    return value.split(/\r\n|\r|\n/).map((content, index) => {
+      const diffLine = picked[index];
+      return diffLine?.content === content
+        ? diffLine
+        : {
+            type: "normal" as DiffLineType,
+            content,
+            charSegments: [{ text: content, type: "normal" as const }],
+          };
+    });
+  }, [side, value, counterpart]);
+
+  const sharedTypography =
+    "m-0 font-mono text-[12.5px] leading-[20px] whitespace-pre break-normal [font-variant-ligatures:none] px-3.5 py-3";
+
+  useLayoutEffect(() => {
+    syncHighlight();
+  }, [syncHighlight, value]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const observer = new ResizeObserver(syncHighlight);
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [syncHighlight]);
+
+  return (
+    <div className="relative flex-1 min-h-[240px] overflow-hidden">
+      {/* Colored, read-only layer (underneath) */}
+      <div
+        ref={highlightRef}
+        aria-hidden="true"
+        data-slot="diff-editable-highlight"
+        className={cn(sharedTypography, "relative min-h-[240px] pointer-events-none select-none")}
+      >
+        {lines.length === 0 ? (
+          <span className="text-muted-foreground/60">{placeholder}</span>
+        ) : (
+          lines.map((line, idx) => (
+            <div
+              key={idx}
+              data-type={line.type}
+              className={cn(
+                "-mx-3.5 px-3.5",
+                "w-full",
+                "min-h-[20px]",
+                diffLineVariants({ type: line.type }),
+                diffLineTextVariants({ type: line.type }),
+                "block",
+              )}
+            >
+              {renderDiffLineContent(line) || "\u200b"}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Transparent editable layer (on top) */}
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={syncHighlight}
+        spellCheck={false}
+        placeholder={placeholder}
+        className={cn(
+          sharedTypography,
+          "absolute inset-0 h-full w-full resize-none overflow-x-auto overflow-y-hidden border-0 bg-transparent text-transparent caret-foreground outline-none",
+          "placeholder:text-transparent",
+        )}
+      />
+    </div>
+  );
+}
+
 export type DiffViewerProps = Partial<SyntaxHighlighterProps> &
   VariantProps<typeof diffViewerVariants> & {
     patch?: string | undefined;
@@ -839,6 +979,7 @@ export type { ParsedLine, ParsedFile, SplitLinePair };
 
 export {
   DiffViewer,
+  DiffEditablePane,
   DiffViewerFile,
   DiffViewerHeader,
   DiffViewerContent,

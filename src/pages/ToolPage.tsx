@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { TextEditorPair } from "../components/TextEditorPair";
 import { CopyButton } from "../components/CopyButton";
-import { DiffViewer } from "@/components/ui/diff-viewer";
+import { DiffViewer, DiffEditablePane } from "@/components/ui/diff-viewer";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
@@ -188,9 +188,10 @@ export default function ToolPage() {
             <div className="inline-flex sm:hidden items-center p-1 bg-muted rounded-lg border border-border/60">
               <button
                 type="button"
+                disabled={diffEditable}
                 onClick={() => setDiffViewMode("split")}
                 aria-pressed={diffViewMode === "split"}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${diffViewMode === "split"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${diffViewMode === "split"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Columns2 className="size-3.5" />
                 <span>Split</span>
@@ -198,9 +199,10 @@ export default function ToolPage() {
 
               <button
                 type="button"
+                disabled={diffEditable}
                 onClick={() => setDiffViewMode("unified")}
                 aria-pressed={diffViewMode === "unified"}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${diffViewMode === "unified"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${diffViewMode === "unified"  ? "bg-background text-foreground shadow-xs font-semibold"  : "text-muted-foreground hover:text-foreground"}`}
               >
                 <Rows3 className="size-3.5" />
                 <span>Unified</span>
@@ -210,7 +212,11 @@ export default function ToolPage() {
         </div>
 
         {/* Main work area */}
-        <div className="flex-1 flex flex-col min-h-0 bg-background">
+        <div
+          className={`flex-1 flex flex-col ${
+            mode === "diff" && diffEditable ? "min-h-max" : "min-h-0"
+          } bg-background`}
+        >
           {mode === "edit" ? (
             <TextEditorPair
               left={left}
@@ -220,9 +226,13 @@ export default function ToolPage() {
               dark={dark}
             />
           ) : (
-            <div className="flex-1 p-4 md:p-6 flex flex-col gap-4">
+            <div
+              className={`p-4 md:p-6 flex flex-col gap-4 ${
+                diffEditable ? "flex-none" : "flex-1"
+              }`}
+            >
               {diffEditable ? (
-                <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+                <div className="flex flex-col lg:flex-row gap-4">
                   {/* Original (editable) */}
                   <div className="flex flex-col flex-1 min-w-0 rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
                     <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/30 border-b border-border/60 text-xs font-medium">
@@ -234,12 +244,12 @@ export default function ToolPage() {
                       </div>
                       <CopyButton text={left} />
                     </div>
-                    <textarea
+                    <DiffEditablePane
+                      side="old"
                       value={left}
-                      onChange={(e) => setLeft(e.target.value)}
-                      spellCheck={false}
+                      counterpart={right}
+                      onChange={setLeft}
                       placeholder="Original text…"
-                      className="flex-1 min-h-[240px] w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
                     />
                   </div>
 
@@ -254,12 +264,12 @@ export default function ToolPage() {
                       </div>
                       <CopyButton text={right} />
                     </div>
-                    <textarea
+                    <DiffEditablePane
+                      side="new"
                       value={right}
-                      onChange={(e) => setRight(e.target.value)}
-                      spellCheck={false}
+                      counterpart={left}
+                      onChange={setRight}
                       placeholder="Modified text…"
-                      className="flex-1 min-h-[240px] w-full resize-none bg-transparent px-3.5 py-3 font-mono text-[12.5px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
                     />
                   </div>
                 </div>

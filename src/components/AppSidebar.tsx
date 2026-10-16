@@ -242,24 +242,26 @@ export function AppSidebar({
                   <div className="grid grid-cols-2 gap-1 p-1 bg-sidebar-accent/60 rounded-lg border border-sidebar-border/60">
                     <button
                       type="button"
+                      disabled={diffEditable}
                       onClick={() => onDiffViewModeChange("split")}
                       className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
                         diffViewMode === "split"
                           ? "bg-background text-foreground shadow-xs font-semibold"
                           : "text-muted-foreground hover:text-foreground"
-                      }`}
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       <Columns2 className="size-3.5" />
                       <span>Split</span>
                     </button>
                     <button
                       type="button"
+                      disabled={diffEditable}
                       onClick={() => onDiffViewModeChange("unified")}
                       className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
                         diffViewMode === "unified"
                           ? "bg-background text-foreground shadow-xs font-semibold"
                           : "text-muted-foreground hover:text-foreground"
-                      }`}
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       <Rows3 className="size-3.5" />
                       <span>Unified</span>
@@ -275,30 +277,32 @@ export function AppSidebar({
                 </div>
                 <div className="space-y-1">
                   {mode === "diff" && onToggleDiffEditable && (
-                    <button
-                      type="button"
-                      onClick={onToggleDiffEditable}
-                      aria-pressed={diffEditable}
-                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                        diffEditable
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <Edit3 className="size-3.5" />
-                        <span>Diff Editor</span>
-                      </span>
-                      <span
-                        className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                    <div className="hidden md:block">
+                      <button
+                        type="button"
+                        onClick={onToggleDiffEditable}
+                        aria-pressed={diffEditable}
+                        className={`w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                           diffEditable
-                            ? "bg-primary/15 border-primary/30 text-primary"
-                            : "bg-sidebar-accent border-sidebar-border text-muted-foreground"
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                         }`}
                       >
-                        {diffEditable ? "On" : "Off"}
-                      </span>
-                    </button>
+                        <span className="flex items-center gap-2.5">
+                          <Edit3 className="size-3.5" />
+                          <span>Diff Editor</span>
+                        </span>
+                        <span
+                          className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                            diffEditable
+                              ? "bg-primary/15 border-primary/30 text-primary"
+                              : "bg-sidebar-accent border-sidebar-border text-muted-foreground"
+                          }`}
+                        >
+                          {diffEditable ? "On" : "Off"}
+                        </span>
+                      </button>
+                    </div>
                   )}
 
                   {onSwap && (
