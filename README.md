@@ -1,91 +1,91 @@
-# DiffViewer — Free Online Diff Checker
+# DiffViewer
 
-Compare two pieces of text or code side by side with line-level and word-level highlighting. Built with React, TypeScript, Vite and Monaco Editor.
+DiffViewer is a free, browser-based tool for comparing two pieces of text or code. Edit or paste the original and modified versions, then inspect additions and deletions in a split or unified diff.
 
-**[Live](https://diffviewer-weld.vercel.app/)**
+**Live app:** [diffviewer-weld.vercel.app](https://diffviewer-weld.vercel.app/)
 
 ## Features
 
-- Side-by-side diff with Monaco Editor
-- Word-level highlighting for the selected line, editable in place
-- Syntax highlighting for 15 languages (JS, TS, JSON, HTML, CSS, Python, SQL and more)
-- Light and dark themes (remembers your choice)
-- Comparison runs in your browser; your text is not uploaded
-- Responsive layout (desktop, tablet, mobile)
-- Built-in blog with per-page SEO
+- Compare text, code, JSON, configuration files, and other plain text.
+- View changes side by side or in a unified layout.
+- Inspect character-level changes within modified lines.
+- Edit either input directly, or switch on editable diff panes to make changes while reviewing.
+- Copy or clear either input, swap the two inputs, and paste from the clipboard.
+- See line numbers, line and character counts, and addition/deletion statistics.
+- Switch between light and dark themes; the theme preference is saved in the browser.
+- Use the responsive interface on desktop and mobile.
+- Read the built-in FAQ and blog.
+- Keep comparisons on your device: text is processed in the browser and is not uploaded.
 
 ## Tech stack
 
-React 19 · TypeScript · Vite · Monaco Editor · Vercel
+React 19 · TypeScript · Vite · Tailwind CSS 4 · `diff` · `parse-diff` · Vercel
 
 ## Getting started
+
+Requirements: Node.js and npm.
 
 ```bash
 git clone https://github.com/ujjwalraj123/diffviewer.git
 cd diffviewer
 npm install
-npm run dev      # http://localhost:4319
+npm run dev
 ```
 
-| Command | What it does |
+Open the local URL printed by Vite (the development server is configured to use port `4319`).
+
+| Command | Description |
 |---|---|
-| `npm run dev` | Start the dev server |
-| `npm run build` | Type-check and build to `dist/` |
-| `npm run preview` | Preview the production build |
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Generate the sitemap, type-check, and build the app to `dist/` |
+| `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint |
+| `npm run sitemap` | Generate `public/sitemap.xml` from the blog posts |
+
+## Routes
+
+- `/` — diff tool
+- `/faq` — frequently asked questions
+- `/blog` — blog index
+- `/blog/:slug` — individual blog post
+
+The app uses a small History API router in `src/lib/router.ts`. Vercel rewrites routes to `index.html`, allowing app routes to load directly.
 
 ## Project structure
 
 ```text
 src/
-  components/   Toolbar, editors, copy button, links
-  pages/        ToolPage, BlogIndex, BlogPost, NotFound
-  content/      posts.ts  ← blog posts live here
-  config/       site.ts   ← site URL and default SEO text
-  hooks/        useSeo, useTheme, useMonacoTheme, useSharedScroll
-  lib/          router, wordDiff, lineMapping
-  styles/       global.css, app.css, blog.css
-public/         robots.txt, sitemap.xml, favicon.svg, og-image.png
+  components/       App layout, sidebar, text editors, and reusable UI
+  config/site.ts    Site URL and default SEO metadata
+  content/          FAQ entries and blog posts
+  hooks/            Clipboard, SEO, and theme hooks
+  lib/              Router, diff utilities, and shared helpers
+  pages/             Diff tool, FAQ, blog pages, and not-found page
+  styles/            Global, app, and blog styles
+scripts/
+  generate-sitemap.mjs
+public/              Static assets, robots.txt, and sitemap.xml
 ```
 
-## Routing
+## Blog posts and sitemap
 
-This is a single-page app with a small History API router (`src/lib/router.ts`):
+Add blog content to the `POSTS` array in `src/content/posts.ts`. Each post has a unique `slug`, title, description, publication date, estimated reading time, and sections. The sitemap generator reads post slugs and dates from this file and includes the tool, FAQ, blog index, and blog post URLs. It runs automatically before each production build; run `npm run sitemap` to regenerate it manually.
 
-- `/` — diff tool
-- `/blog` — blog index
-- `/blog/:slug` — blog post
+Page titles, descriptions, canonical URLs, Open Graph metadata, and structured data are set by the pages using `src/hooks/useSeo.ts`.
 
-`vercel.json` rewrites all paths to `index.html` so deep links work on refresh.
+## Deployment
 
-## Adding a blog post
+The project is configured for Vercel. Use the Vite framework preset, `npm run build` as the build command, and `dist` as the output directory. `vercel.json` contains the SPA rewrite and response headers.
 
-1. Add an object to `POSTS` in `src/content/posts.ts` (slug, title, description, date, sections).
-2. Add its URL to `public/sitemap.xml`.
-3. Deploy. Title, meta description, canonical URL, Open Graph tags and `BlogPosting` JSON-LD are generated automatically by `useSeo`.
-
-## SEO checklist
-
-- [ ] Set your real domain in `src/config/site.ts`, `index.html`, `public/robots.txt` and `public/sitemap.xml`
-- [ ] Add `public/og-image.png` (1200×630) and `public/favicon.svg`
-- [ ] Submit `sitemap.xml` in Google Search Console and Bing Webmaster Tools
-- [ ] Keep one `<h1>` per page and unique titles/descriptions
-
-## Deployment (Vercel)
-
-```text
-Framework: Vite
-Build command: npm run build
-Output directory: dist
-```
+If deploying to a different domain, update the site URL in `src/config/site.ts`, `scripts/generate-sitemap.mjs`, `index.html`, `public/robots.txt`, and `public/sitemap.xml`.
 
 ## Privacy
 
-Text you paste is compared locally in your browser. Note that Monaco Editor's code is loaded from a CDN by `@monaco-editor/react`, but your content is not sent anywhere. Even so, avoid pasting secrets into any online tool unless you trust the deployment.
+The comparison is performed in your browser; the text you enter is not sent to the app's server for processing. As with any online tool, avoid entering secrets or sensitive personal data unless you are comfortable doing so.
 
 ## Contributing
 
-1. Create a branch
-2. Make your changes
-3. Run `npm run lint` and `npm run build`
-4. Open a pull request
+1. Create a branch for your change.
+2. Make and test your changes.
+3. Run `npm run lint` and `npm run build`.
+4. Open a pull request.
