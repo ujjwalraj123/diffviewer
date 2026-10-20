@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLayout } from "../components/AppLayout";
+import { ToolSwitcher } from "../components/ToolSwitcher";
 import { TextEditorPair } from "../components/TextEditorPair";
 import { CopyButton } from "../components/CopyButton";
 import { DiffViewer, DiffEditablePane } from "@/components/ui/diff-viewer";
@@ -175,15 +176,10 @@ export default function ToolPage() {
     >
       <div className="flex flex-col flex-1 min-w-0">
         {/* Sub-header navigation and status bar */}
-        <div className="h-16 min-h-16 shrink-0 flex items-center justify-between gap-2 px-3 sm:px-6 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs">
-          {/* Desktop: Logo and title */}
-          <div className="hidden sm:flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              {/* <FileCode2 className="size-4 text-primary" /> */}
-              <h1 className="text-sm font-semibold text-foreground tracking-tight m-0">
-                Diff Workspace
-              </h1>
-            </div>
+        <div className="h-auto min-h-16 shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs sm:h-16 sm:flex-nowrap sm:px-6">
+          {/* Workspace identity and tool selector */}
+          <div className="flex items-center gap-3">
+            <ToolSwitcher currentTool="diff" />
           </div>
 
           {/* Mode switcher and responsive view controls */}

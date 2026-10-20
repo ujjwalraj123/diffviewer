@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
+import { ToolSwitcher } from "../components/ToolSwitcher";
 import { CodeEditorPane } from "../components/TextEditorPair";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
-import { Link } from "../components/Link";
 import { navigate } from "../lib/router";
 import {
   parseJsonWithError,
@@ -15,11 +15,7 @@ import {
 } from "../lib/jsonFormatter";
 import { JSON_FAQS } from "../content/faqs";
 import {
-  Braces,
   Sparkles,
-  Minimize2,
-  ArrowDownAZ,
-  RotateCcw,
   GitCompare,
   Download,
   AlertCircle,
@@ -199,34 +195,7 @@ export default function JsonFormatterPage() {
         <div className="min-h-16 shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-3 sm:px-6 py-3 border-b border-border bg-card/60 backdrop-blur-xs 2xl:h-16">
           {/* Tool Identifier and Tool Tabs */}
           <div className="flex items-center justify-between sm:justify-start gap-3">
-            <div className="flex items-center gap-2">
-              <div className="size-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-                <Braces className="size-4" />
-              </div>
-              <div>
-                <h1 className="text-sm font-semibold text-foreground tracking-tight m-0">
-                  JSON Formatter
-                </h1>
-                <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                  Client-side &amp; character-accurate
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Tool Switcher Tabs */}
-            <div className="inline-flex items-center p-0.5 bg-muted rounded-lg border border-border/60 text-xs">
-              <Link
-                to="/"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-              >
-                <GitCompare className="size-3.5" />
-                <span>Diff Tool</span>
-              </Link>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-background text-foreground shadow-xs">
-                <Braces className="size-3.5 text-emerald-500" />
-                <span>JSON Formatter</span>
-              </span>
-            </div>
+            <ToolSwitcher currentTool="json" />
           </div>
 
           {/* Responsive Action Toolbar */}
@@ -267,94 +236,6 @@ export default function JsonFormatterPage() {
                 Both
               </button>
             </div>
-
-            {/* Indent Selector */}
-            <div className="inline-flex items-center p-0.5 bg-muted rounded-lg border border-border/60 text-xs">
-              <button
-                type="button"
-                onClick={() => setIndent(2)}
-                className={`px-2 py-1 rounded-md font-mono transition-all cursor-pointer ${
-                  indent === 2
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                2sp
-              </button>
-              <button
-                type="button"
-                onClick={() => setIndent(4)}
-                className={`px-2 py-1 rounded-md font-mono transition-all cursor-pointer ${
-                  indent === 4
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                4sp
-              </button>
-              <button
-                type="button"
-                onClick={() => setIndent("tab")}
-                className={`px-2 py-1 rounded-md font-mono transition-all cursor-pointer ${
-                  indent === "tab"
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                tab
-              </button>
-            </div>
-
-            {/* Sort Keys Toggle */}
-            <button
-              type="button"
-              onClick={() => setSortKeys((v) => !v)}
-              title="Sort object keys alphabetically"
-              aria-pressed={sortKeys}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                sortKeys
-                  ? "bg-primary/10 border-primary/30 text-primary font-semibold"
-                  : "bg-background border-border/80 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ArrowDownAZ className="size-3.5" />
-              <span className="hidden sm:inline">Sort Keys</span>
-            </button>
-
-            {/* Load Sample Button */}
-            <button
-              type="button"
-              onClick={handleLoadSample}
-              title="Load sample JSON"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
-              <RotateCcw className="size-3.5" />
-              <span className="hidden sm:inline">Sample</span>
-            </button>
-
-            {/* Format Button */}
-            <button
-              type="button"
-              onClick={handleFormat}
-              disabled={!parseResult.valid || !inputJson.trim()}
-              title="Format and beautify JSON"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <Sparkles className="size-3.5" />
-              <span>Format</span>
-            </button>
-
-            {/* Minify Button */}
-            <button
-              type="button"
-              onClick={handleMinify}
-              disabled={!parseResult.valid || !inputJson.trim()}
-              title="Minify JSON (remove whitespace)"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-border/80 bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <Minimize2 className="size-3.5" />
-              <span className="hidden md:inline">Minify</span>
-            </button>
 
             {/* Compare in Diff Tool Button */}
             <button
