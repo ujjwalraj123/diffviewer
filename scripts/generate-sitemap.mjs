@@ -31,6 +31,7 @@ const today = new Date().toISOString().slice(0, 10)
 
 const urls = [
   { loc: `${SITE_URL}/`, lastmod: today },
+  { loc: `${SITE_URL}/json-formatter`, lastmod: today },
   { loc: `${SITE_URL}/faq`, lastmod: today },
   { loc: `${SITE_URL}/blog`, lastmod: today },
   ...slugs.map((slug, i) => ({

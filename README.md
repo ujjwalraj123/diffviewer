@@ -1,21 +1,34 @@
 # DiffViewer
 
-DiffViewer is a free, browser-based tool for comparing two pieces of text or code. Edit or paste the original and modified versions, then inspect additions and deletions in a split or unified diff.
+DiffViewer is a free, browser-based developer toolkit featuring an online text and code diff checker alongside a private JSON Formatter and Validator. Edit or paste text to inspect additions and deletions, or format, minify, and validate JSON payloads with instant character-level accuracy.
 
 **Live app:** [diffviewer-weld.vercel.app](https://diffviewer-weld.vercel.app/)
 
 ## Features
 
+### Diff Checker
 - Compare text, code, JSON, configuration files, and other plain text.
-- View changes side by side or in a unified layout.
+- View changes side by side (split) or in a unified layout.
 - Inspect character-level changes within modified lines.
 - Edit either input directly, or switch on editable diff panes to make changes while reviewing.
 - Copy or clear either input, swap the two inputs, and paste from the clipboard.
 - See line numbers, line and character counts, and addition/deletion statistics.
+
+### JSON Formatter & Validator
+- Beautify and format raw JSON with customizable indentation (2 spaces, 4 spaces, or tab).
+- Minify JSON to strip all unnecessary whitespace and newlines for compact payloads.
+- Recursively sort object keys alphabetically while preserving array element order.
+- Real-time syntax validation that pinpoints errors by line number, column number, and visual caret pointer.
+- Two-pane editor layout with synchronized line gutters, line/character counters, clipboard actions, and file download.
+- Mobile view support with dedicated Input/Output tab toggling and responsive toolbar controls.
+- "Compare in Diff" button to instantly send raw and formatted JSON into DiffViewer for side-by-side inspection.
+
+### Platform & UI
+- Dedicated Tools tab in sidebar navigation grouping Diff Tool and JSON Formatter.
 - Switch between light and dark themes; the theme preference is saved in the browser.
-- Use the responsive interface on desktop and mobile.
-- Read the built-in FAQ and blog.
-- Keep comparisons on your device: text is processed in the browser and is not uploaded.
+- Fully responsive interface optimized for both desktop and mobile devices.
+- Read built-in FAQs and comprehensive developer blog guides.
+- 100% client-side execution: text and JSON payloads are processed in the browser and are never uploaded.
 
 ## Tech stack
 
@@ -40,11 +53,12 @@ Open the local URL printed by Vite (the development server is configured to use 
 | `npm run build` | Generate the sitemap, type-check, and build the app to `dist/` |
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint |
-| `npm run sitemap` | Generate `public/sitemap.xml` from the blog posts |
+| `npm run sitemap` | Generate `public/sitemap.xml` from the blog posts and tool routes |
 
 ## Routes
 
-- `/` — diff tool
+- `/` (or `/tools/diff-viewer`) — Diff tool workspace
+- `/json-formatter` (or `/tools/json-formatter`, `/tools`) — JSON Formatter & Validator tool
 - `/faq` — frequently asked questions
 - `/blog` — blog index
 - `/blog/:slug` — individual blog post
@@ -55,16 +69,16 @@ The app uses a small History API router in `src/lib/router.ts`. Vercel rewrites 
 
 ```text
 src/
-  components/       App layout, sidebar, text editors, and reusable UI
+  components/       App layout, sidebar with Tools tab, text editors, and reusable UI
   config/site.ts    Site URL and default SEO metadata
-  content/          FAQ entries and blog posts
+  content/          FAQ entries and blog posts (including JSON formatting guides)
   hooks/            Clipboard, SEO, and theme hooks
-  lib/              Router, diff utilities, and shared helpers
-  pages/             Diff tool, FAQ, blog pages, and not-found page
-  styles/            Global, app, and blog styles
+  lib/              Router, JSON formatter, diff utilities, and shared helpers
+  pages/            Diff tool, JSON formatter, FAQ, blog pages, and not-found page
+  styles/           Global, app, and blog styles
 scripts/
   generate-sitemap.mjs
-public/              Static assets, robots.txt, and sitemap.xml
+public/             Static assets, robots.txt, and sitemap.xml
 ```
 
 ## Blog posts and sitemap

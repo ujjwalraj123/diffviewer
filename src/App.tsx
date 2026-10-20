@@ -10,14 +10,22 @@ import './styles/app.css'
 import './styles/blog.css'
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
+const JsonFormatterPage = lazy(() => import('./pages/JsonFormatterPage'))
 
 export default function App() {
   const path = usePath()
 
-  if (path === '/' || path === '') {
+  if (path === '/' || path === '' || path === '/tools/diff-viewer') {
     return (
       <Suspense fallback={<div className="loading">Loading…</div>}>
         <ToolPage />
+      </Suspense>
+    )
+  }
+  if (path === '/json-formatter' || path === '/tools/json-formatter' || path === '/tools') {
+    return (
+      <Suspense fallback={<div className="loading">Loading…</div>}>
+        <JsonFormatterPage />
       </Suspense>
     )
   }

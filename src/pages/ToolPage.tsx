@@ -34,12 +34,44 @@ greet("there", "Hi");
 */
 
 export default function ToolPage() {
-  const [mode, setMode] = useState<"edit" | "diff">("edit");
+  const [mode, setMode] = useState<"edit" | "diff">(() => {
+    try {
+      if (sessionStorage.getItem("dv_diff_auto_mode") === "diff") {
+        sessionStorage.removeItem("dv_diff_auto_mode");
+        return "diff";
+      }
+    } catch {
+      // ignore
+    }
+    return "edit";
+  });
   const [diffViewMode, setDiffViewMode] = useState<"split" | "unified">("split");
   // When true, the diff view becomes editable in place (Diff Editor action).
   const [diffEditable, setDiffEditable] = useState(false);
-  const [left, setLeft] = useState("");
-  const [right, setRight] = useState("");
+  const [left, setLeft] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("dv_diff_left");
+      if (saved) {
+        sessionStorage.removeItem("dv_diff_left");
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  });
+  const [right, setRight] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("dv_diff_right");
+      if (saved) {
+        sessionStorage.removeItem("dv_diff_right");
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  });
   const { dark, toggle } = useTheme();
 
   // Persistent workflow state
@@ -143,7 +175,7 @@ export default function ToolPage() {
     >
       <div className="flex flex-col flex-1 min-w-0">
         {/* Sub-header navigation and status bar */}
-        <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs">
+        <div className="h-16 min-h-16 shrink-0 flex items-center justify-between gap-2 px-3 sm:px-6 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs">
           {/* Desktop: Logo and title */}
           <div className="hidden sm:flex items-center gap-3">
             <div className="flex items-center gap-2">

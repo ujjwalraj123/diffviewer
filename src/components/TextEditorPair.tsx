@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useEffect, useCallback, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { CopyButton } from './CopyButton'
 import { ClipboardPaste, Trash2, FileText } from 'lucide-react'
 
@@ -10,19 +10,31 @@ interface TextEditorPairProps {
   dark?: boolean
 }
 
-function CodeEditorPane({
-  title,
-  subTitle,
-  value,
-  onChange,
-  placeholder,
-}: {
+export interface CodeEditorPaneProps {
   title: string
   subTitle?: string
   value: string
   onChange: (v: string) => void
   placeholder: string
-}) {
+  readOnly?: boolean
+  errorLine?: number | null
+  statusBadge?: ReactNode
+  extraHeaderActions?: ReactNode
+  footer?: ReactNode
+}
+
+export function CodeEditorPane({
+  title,
+  subTitle,
+  value,
+  onChange,
+  placeholder,
+  readOnly = false,
+  errorLine,
+  statusBadge,
+  extraHeaderActions,
+  footer,
+}: CodeEditorPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const gutterRef = useRef<HTMLDivElement>(null)
 
@@ -38,6 +50,7 @@ function CodeEditorPane({
 
   // Handle Tab key to insert spaces
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (readOnly) return
     if (e.key === 'Tab') {
       e.preventDefault()
       const textarea = textareaRef.current
@@ -57,6 +70,7 @@ function CodeEditorPane({
   }
 
   const handlePaste = useCallback(async () => {
+    if (readOnly) return
     try {
       const text = await navigator.clipboard.readText()
       if (text) {
@@ -65,7 +79,7 @@ function CodeEditorPane({
     } catch {
       // Clipboard permissions denied
     }
-  }, [onChange])
+  }, [onChange, readOnly])
 
   useEffect(() => {
     handleScroll()
@@ -75,17 +89,18 @@ function CodeEditorPane({
     <div className="flex flex-col flex-1 min-w-0 h-full border border-border/70 rounded-xl bg-card shadow-xs overflow-hidden">
       {/* Pane Header */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/30 border-b border-border/60 text-xs font-medium">
-        <div className="flex items-center gap-2">
-          <FileText className="size-3.5 text-muted-foreground" />
-          <span className="font-semibold text-foreground tracking-tight">{title}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="size-3.5 text-muted-foreground shrink-0" />
+          <span className="font-semibold text-foreground tracking-tight truncate">{title}</span>
           {subTitle && (
-            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+            <span className="text-[11px] text-muted-foreground hidden sm:inline truncate">
               ({subTitle})
             </span>
           )}
+          {statusBadge}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground tabular-nums">
             {lineCount} {lineCount === 1 ? 'line' : 'lines'}
           </span>
@@ -95,26 +110,32 @@ function CodeEditorPane({
 
           <div className="h-3.5 w-px bg-border/60 mx-1" />
 
-          <button
-            type="button"
-            onClick={handlePaste}
-            title="Paste from clipboard"
-            className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-          >
-            <ClipboardPaste className="size-3.5" />
-          </button>
+          {extraHeaderActions}
+
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={handlePaste}
+              title="Paste from clipboard"
+              className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+            >
+              <ClipboardPaste className="size-3.5" />
+            </button>
+          )}
 
           <CopyButton text={value} />
 
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            disabled={!value}
-            title="Clear content"
-            className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              disabled={!value}
+              title="Clear content"
+              className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -126,11 +147,19 @@ function CodeEditorPane({
           aria-hidden="true"
           className="w-12 shrink-0 py-3 text-right pr-3 select-none text-muted-foreground/35 border-r border-border/40 overflow-hidden text-xs leading-[20px] font-mono"
         >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i + 1} className="h-[20px]">
-              {i + 1}
-            </div>
-          ))}
+          {Array.from({ length: lineCount }, (_, i) => {
+            const isError = errorLine !== undefined && errorLine !== null && i + 1 === errorLine
+            return (
+              <div
+                key={i + 1}
+                className={`h-[20px] transition-colors ${
+                  isError ? 'bg-destructive/25 text-destructive font-bold' : ''
+                }`}
+              >
+                {i + 1}
+              </div>
+            )
+          })}
         </div>
 
         {/* Text Area */}
@@ -141,12 +170,17 @@ function CodeEditorPane({
           onKeyDown={handleKeyDown}
           onScroll={handleScroll}
           placeholder={placeholder}
+          readOnly={readOnly}
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
-          className="flex-1 p-3 bg-transparent text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-[20px] font-mono text-[13px] whitespace-pre overflow-x-auto overflow-y-hidden"
+          className={`flex-1 p-3 bg-transparent text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-[20px] font-mono text-[13px] whitespace-pre overflow-x-auto overflow-y-hidden ${
+            readOnly ? 'cursor-default' : ''
+          }`}
         />
       </div>
+
+      {footer}
     </div>
   )
 }

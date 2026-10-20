@@ -16,6 +16,13 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Braces,
+  Wrench,
+  Sparkles,
+  Minimize2,
+  ArrowDownAZ,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 export interface AppSidebarProps {
@@ -31,6 +38,16 @@ export interface AppSidebarProps {
   onToggleDiffEditable?: () => void;
   dark: boolean;
   onToggleDark: () => void;
+
+  // JSON Formatter specific sidebar props
+  jsonIndent?: 2 | 4 | "tab" | 1;
+  onJsonIndentChange?: (indent: 2 | 4 | "tab" | 1) => void;
+  jsonSortKeys?: boolean;
+  onToggleJsonSortKeys?: () => void;
+  onJsonFormat?: () => void;
+  onJsonMinify?: () => void;
+  onJsonLoadSample?: () => void;
+  onJsonClear?: () => void;
 }
 
 export function AppSidebar({
@@ -46,11 +63,22 @@ export function AppSidebar({
   onToggleDiffEditable,
   dark = false,
   onToggleDark,
+  jsonIndent = 2,
+  onJsonIndentChange,
+  jsonSortKeys = false,
+  onToggleJsonSortKeys,
+  onJsonFormat,
+  onJsonMinify,
+  onJsonLoadSample,
+  onJsonClear,
 }: AppSidebarProps) {
   const currentPath = usePath();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(true);
 
-  const isTool = currentPath === "/" || currentPath === "";
+  const isDiffTool = currentPath === "/" || currentPath === "" || currentPath === "/tools/diff-viewer";
+  const isJsonFormatter = currentPath === "/json-formatter" || currentPath === "/tools/json-formatter" || currentPath === "/tools";
+  const isTool = isDiffTool;
   const isFaq = currentPath === "/faq";
   const isBlog = currentPath.startsWith("/blog");
 
@@ -121,7 +149,7 @@ export function AppSidebar({
         }`}
       >
         {/* Brand Header */}
-        <div className="p-4 border-b border-sidebar-border/70 flex items-center justify-between">
+        <div className="h-16 min-h-16 shrink-0 p-4 border-b border-sidebar-border/70 flex items-center justify-between">
           <Link
             to="/"
             onClick={handleDiffClick}
@@ -152,46 +180,99 @@ export function AppSidebar({
             <div className="px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Navigation
             </div>
-            <nav className="space-y-1">
-              <Link
-                to="/"
-                onClick={handleDiffClick}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  isTool
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                }`}
-              >
-                <GitCompare className="size-4" />
-                <span>Diff Tool</span>
-              </Link>
 
-              <Link
-                to="/faq"
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  isFaq
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                }`}
+            {/* Tools Tab / Group */}
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setToolsOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors cursor-pointer"
               >
-                <HelpCircle className="size-4" />
-                <span>FAQ</span>
-              </Link>
+                <div className="flex items-center gap-2">
+                  <Wrench className="size-3.5 text-primary" />
+                  <span className="uppercase tracking-wider text-[11px]">Tools</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary font-medium">
+                    2
+                  </span>
+                  {toolsOpen ? (
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="size-3 text-muted-foreground" />
+                  )}
+                </div>
+              </button>
 
-              <Link
-                to="/blog"
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  isBlog
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                }`}
-              >
-                <BookOpen className="size-4" />
-                <span>Blog &amp; Guides</span>
-              </Link>
-            </nav>
+              {toolsOpen && (
+                <nav className="space-y-1 pl-1" aria-label="Tools Navigation">
+                  <Link
+                    to="/"
+                    onClick={handleDiffClick}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      isDiffTool
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                        : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    }`}
+                  >
+                    <GitCompare className="size-4" />
+                    <span>Diff Tool</span>
+                  </Link>
+
+                  <Link
+                    to="/json-formatter"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      isJsonFormatter
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                        : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Braces className="size-4 text-emerald-500" />
+                      <span>JSON Formatter</span>
+                    </div>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      New
+                    </span>
+                  </Link>
+                </nav>
+              )}
+            </div>
+
+            {/* Explore Section */}
+            <div className="pt-3 mt-3 border-t border-sidebar-border/60">
+              <div className="px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Explore
+              </div>
+              <nav className="space-y-1">
+                <Link
+                  to="/faq"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isFaq
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  }`}
+                >
+                  <HelpCircle className="size-4" />
+                  <span>FAQ</span>
+                </Link>
+
+                <Link
+                  to="/blog"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isBlog
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  }`}
+                >
+                  <BookOpen className="size-4" />
+                  <span>Blog &amp; Guides</span>
+                </Link>
+              </nav>
+            </div>
           </div>
 
           {/* Diff Controls (shown on Tool Page) */}
@@ -335,6 +416,132 @@ export function AppSidebar({
                     >
                       <Trash2 className="size-3.5" />
                       <span>Clear All Text</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* JSON Controls (shown on JSON Formatter Page) */}
+          {isJsonFormatter && onJsonFormat && (
+            <div className="space-y-4 pt-3 border-t border-sidebar-border/70">
+              {/* Indentation Selector */}
+              {onJsonIndentChange && (
+                <div className="hidden md:block">
+                  <label className="block px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Indentation
+                  </label>
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-sidebar-accent/60 rounded-lg border border-sidebar-border/60">
+                    <button
+                      type="button"
+                      onClick={() => onJsonIndentChange(2)}
+                      className={`py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        jsonIndent === 2
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      2 Sp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onJsonIndentChange(4)}
+                      className={`py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        jsonIndent === 4
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      4 Sp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onJsonIndentChange("tab")}
+                      className={`py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        jsonIndent === "tab"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Tab
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* JSON Actions */}
+              <div className="pt-2">
+                <div className="px-2 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Actions
+                </div>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={onJsonFormat}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="size-3.5" />
+                    <span>Beautify / Format</span>
+                  </button>
+
+                  {onJsonMinify && (
+                    <button
+                      type="button"
+                      onClick={onJsonMinify}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
+                    >
+                      <Minimize2 className="size-3.5" />
+                      <span>Minify (Compact)</span>
+                    </button>
+                  )}
+
+                  {onToggleJsonSortKeys && (
+                    <button
+                      type="button"
+                      onClick={onToggleJsonSortKeys}
+                      aria-pressed={jsonSortKeys}
+                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        jsonSortKeys
+                          ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <ArrowDownAZ className="size-3.5" />
+                        <span>Sort Keys (A-Z)</span>
+                      </span>
+                      <span
+                        className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                          jsonSortKeys
+                            ? "bg-primary/15 border-primary/30 text-primary"
+                            : "bg-sidebar-accent border-sidebar-border text-muted-foreground"
+                        }`}
+                      >
+                        {jsonSortKeys ? "On" : "Off"}
+                      </span>
+                    </button>
+                  )}
+
+                  {onJsonLoadSample && (
+                    <button
+                      type="button"
+                      onClick={onJsonLoadSample}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="size-3.5" />
+                      <span>Load Sample JSON</span>
+                    </button>
+                  )}
+
+                  {onJsonClear && (
+                    <button
+                      type="button"
+                      onClick={onJsonClear}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>Clear All</span>
                     </button>
                   )}
                 </div>
