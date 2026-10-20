@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   HelpCircle,
   Info,
+  ArrowLeftRight,
+  Trash2,
 } from "lucide-react";
 /*
 const SAMPLE_LEFT = `function greet(name) {
@@ -179,7 +181,31 @@ export default function ToolPage() {
         <div className="h-auto min-h-16 shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-3.5 border-b border-border bg-card/60 backdrop-blur-xs sm:h-16 sm:flex-nowrap sm:px-6">
           {/* Workspace identity and tool selector */}
           <div className="flex items-center gap-3">
-            <ToolSwitcher currentTool="diff" />
+            <ToolSwitcher
+              currentTool="diff"
+              actions={[
+                {
+                  label: "Swap Sides",
+                  Icon: ArrowLeftRight,
+                  onSelect: handleSwap,
+                  disabled: !left && !right,
+                },
+                {
+                  label: diffEditable ? "Turn Diff Editor Off" : "Turn Diff Editor On",
+                  Icon: Edit3,
+                  onSelect: () => setDiffEditable((value) => !value),
+                  active: diffEditable,
+                  disabled: mode !== "diff",
+                },
+                {
+                  label: "Clear All Text",
+                  Icon: Trash2,
+                  onSelect: handleClear,
+                  disabled: !left && !right,
+                  destructive: true,
+                },
+              ]}
+            />
           </div>
 
           {/* Mode switcher and responsive view controls */}

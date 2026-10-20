@@ -1,9 +1,11 @@
 import { Menu } from "@base-ui/react/menu";
 import { Braces, Check, ChevronDown, GitCompare } from "lucide-react";
 import { navigate } from "../lib/router";
+import { MobileActionsMenu, type MobileHeaderAction } from "./MobileActionsMenu";
 
 type ToolSwitcherProps = {
   currentTool: "diff" | "json";
+  actions: MobileHeaderAction[];
 };
 
 const tools = [
@@ -11,7 +13,7 @@ const tools = [
   { id: "json", label: "JSON Formatter", path: "/json-formatter", Icon: Braces },
 ] as const;
 
-export function ToolSwitcher({ currentTool }: ToolSwitcherProps) {
+export function ToolSwitcher({ currentTool, actions }: ToolSwitcherProps) {
   const selectedTool = currentTool === "diff" ? tools[0] : tools[1];
   const SelectedIcon = selectedTool.Icon;
 
@@ -29,10 +31,11 @@ export function ToolSwitcher({ currentTool }: ToolSwitcherProps) {
       <h1 className="m-0 w-36 shrink-0 whitespace-nowrap text-sm font-semibold tracking-tight text-foreground">
         {selectedTool.label}
       </h1>
+      <MobileActionsMenu actions={actions} />
       <Menu.Root>
         <Menu.Trigger
           aria-label="Select tool"
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/60 bg-muted px-2.5 text-xs font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="hidden h-8 items-center gap-1.5 rounded-lg border border-border/60 bg-muted px-2.5 text-xs font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 md:inline-flex"
         >
           <span>Tools</span>
           <ChevronDown className="size-3.5 text-muted-foreground" />

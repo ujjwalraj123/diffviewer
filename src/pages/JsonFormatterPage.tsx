@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { ToolSwitcher } from "../components/ToolSwitcher";
+import type { MobileHeaderAction } from "../components/MobileActionsMenu";
 import { CodeEditorPane } from "../components/TextEditorPair";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
@@ -17,6 +18,10 @@ import { JSON_FAQS } from "../content/faqs";
 import {
   Sparkles,
   GitCompare,
+  Minimize2,
+  ArrowDownAZ,
+  RotateCcw,
+  Trash2,
   Download,
   AlertCircle,
   CheckCircle2,
@@ -166,6 +171,41 @@ export default function JsonFormatterPage() {
     navigate("/");
   };
 
+  const mobileActions: MobileHeaderAction[] = [
+    {
+      label: "Format JSON",
+      Icon: Sparkles,
+      onSelect: handleFormat,
+      disabled: !parseResult.valid || !inputJson.trim(),
+    },
+    {
+      label: "Minify JSON",
+      Icon: Minimize2,
+      onSelect: handleMinify,
+      disabled: !parseResult.valid || !inputJson.trim(),
+    },
+    {
+      label: "Sort Keys",
+      Icon: ArrowDownAZ,
+      onSelect: () => setSortKeys((value) => !value),
+      active: sortKeys,
+    },
+    { label: "Load Sample", Icon: RotateCcw, onSelect: handleLoadSample },
+    {
+      label: "Compare in Diff",
+      Icon: GitCompare,
+      onSelect: handleSendToDiff,
+      disabled: !inputJson.trim(),
+    },
+    {
+      label: "Clear All",
+      Icon: Trash2,
+      onSelect: handleClear,
+      disabled: !inputJson,
+      destructive: true,
+    },
+  ];
+
   // Adjust viewTab on screen resize
   useEffect(() => {
     const handleResize = () => {
@@ -195,7 +235,7 @@ export default function JsonFormatterPage() {
         <div className="min-h-16 shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-3 sm:px-6 py-3 border-b border-border bg-card/60 backdrop-blur-xs 2xl:h-16">
           {/* Tool Identifier and Tool Tabs */}
           <div className="flex items-center justify-between sm:justify-start gap-3">
-            <ToolSwitcher currentTool="json" />
+            <ToolSwitcher currentTool="json" actions={mobileActions} />
           </div>
 
           {/* Responsive Action Toolbar */}
@@ -243,7 +283,7 @@ export default function JsonFormatterPage() {
               onClick={handleSendToDiff}
               disabled={!inputJson.trim()}
               title="Send to Diff Tool to compare raw vs formatted side by side"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-border/80 bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-border/80 bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <GitCompare className="size-3.5 text-primary" />
               <span className="hidden lg:inline">Compare in Diff</span>
