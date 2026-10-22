@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { ToolSwitcher } from "../components/ToolSwitcher";
+import { SearchResultsPanel, SearchToolbar } from "../components/SearchToolbar";
 import type { MobileHeaderAction } from "../components/MobileActionsMenu";
 import { CodeEditorPane } from "../components/TextEditorPair";
 import { useSeo } from "../hooks/useSeo";
@@ -8,6 +9,7 @@ import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
 import { navigate } from "../lib/router";
 import { JSON_FAQS } from "../content/faqs";
+import { findTextMatches } from "../lib/utils";
 import {
   Sparkles,
   GitCompare,
@@ -31,6 +33,8 @@ interface JsonParseResult {
     message: string;
     line?: number;
     column?: number;
+    start?: number;
+    length?: number;
     excerpt?: string;
   };
 }
@@ -69,25 +73,69 @@ function parseJsonWithError(raw: string): JsonParseResult {
   try {
     return { valid: true, data: JSON.parse(raw) };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    let message = err instanceof Error ? err.message : String(err);
     let line: number | undefined;
     let column: number | undefined;
+    let errorPosition: number | undefined;
 
-    const lineColumnMatch = message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
-    if (lineColumnMatch) {
-      line = Number(lineColumnMatch[1]);
-      column = Number(lineColumnMatch[2]);
-    } else {
-      const positionMatch = message.match(/position\s+(\d+)/i);
-      if (positionMatch) {
-        const beforeError = raw.slice(0, Number(positionMatch[1]));
-        const precedingLines = beforeError.split("\n");
-        line = precedingLines.length;
-        column = precedingLines[precedingLines.length - 1].length + 1;
-      } else {
-        const lineMatch = message.match(/line\s+(\d+)/i);
-        if (lineMatch) line = Number(lineMatch[1]);
+    let inString = false;
+    let escaped = false;
+    for (let index = 0; index < raw.length; index += 1) {
+      const character = raw[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === "\\") {
+          escaped = true;
+        } else if (character === '"') {
+          inString = false;
+        }
+        continue;
       }
+
+      if (character === '"') {
+        inString = true;
+      } else if (character === ",") {
+        let nextIndex = index + 1;
+        while (/\s/.test(raw[nextIndex] ?? "")) nextIndex += 1;
+        if (raw[nextIndex] === "}" || raw[nextIndex] === "]") {
+          errorPosition = index;
+          message = `Trailing comma before "${raw[nextIndex]}" is not allowed in JSON.`;
+          break;
+        }
+      }
+    }
+
+    if (errorPosition !== undefined) {
+      const precedingLines = raw.slice(0, errorPosition).split("\n");
+      line = precedingLines.length;
+      column = precedingLines[precedingLines.length - 1].length + 1;
+    } else {
+      const lineColumnMatch = message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+      if (lineColumnMatch) {
+        line = Number(lineColumnMatch[1]);
+        column = Number(lineColumnMatch[2]);
+      } else {
+        const positionMatch = message.match(/position\s+(\d+)/i);
+        if (positionMatch) {
+          errorPosition = Number(positionMatch[1]);
+          const beforeError = raw.slice(0, errorPosition);
+          const precedingLines = beforeError.split("\n");
+          line = precedingLines.length;
+          column = precedingLines[precedingLines.length - 1].length + 1;
+        } else {
+          const lineMatch = message.match(/line\s+(\d+)/i);
+          if (lineMatch) line = Number(lineMatch[1]);
+        }
+      }
+    }
+
+    if (errorPosition === undefined && line !== undefined && column !== undefined) {
+      errorPosition =
+        raw.split("\n").slice(0, line - 1).join("\n").length +
+        (line > 1 ? 1 : 0) +
+        column -
+        1;
     }
 
     let excerpt: string | undefined;
@@ -101,7 +149,15 @@ function parseJsonWithError(raw: string): JsonParseResult {
 
     return {
       valid: false,
-      error: { message, line, column, excerpt },
+      error: {
+        message,
+        line,
+        column,
+        start: errorPosition,
+        length:
+          errorPosition !== undefined && errorPosition < raw.length ? 1 : 0,
+        excerpt,
+      },
     };
   }
 }
@@ -138,12 +194,12 @@ function stringifyJsonData(
         const property = `${JSON.stringify(key)}${
           indentation ? ": " : ":"
         }${stringify((value as Record<string, unknown>)[key], depth + 1)}`;
-        return indentation ? `${indentation.repeat(depth + 1)}${property}` : property;
+        return indentation
+          ? `${indentation.repeat(depth + 1)}${property}`
+          : property;
       });
       if (!indentation) return `{${properties.join(",")}}`;
-      return `{\n${properties.join(
-        `,\n`,
-      )}\n${indentation.repeat(depth)}}`;
+      return `{\n${properties.join(`,\n`)}\n${indentation.repeat(depth)}}`;
     }
 
     return JSON.stringify(value) ?? "null";
@@ -173,16 +229,48 @@ export default function JsonFormatterPage() {
   const [inputJson, setInputJson] = useState<string>(SAMPLE_JSON);
   const [indent, setIndent] = useState<IndentType>(2);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
+  const [searchSelection, setSearchSelection] = useState<
+    { start: number; length: number; token: number } | undefined
+  >();
   const { dark, toggle } = useTheme();
 
   // Parse input in real time
   const parseResult = useMemo(() => {
     return parseJsonWithError(inputJson);
   }, [inputJson]);
+  const searchResults = useMemo(
+    () => findTextMatches(inputJson, searchQuery),
+    [inputJson, searchQuery],
+  );
+  const selectedSearchIndex =
+    searchResults.length > 0 ? activeSearchIndex % searchResults.length : -1;
+
+  const selectSearchResult = (index: number) => {
+    const result = searchResults[index];
+    if (!result) return;
+    setActiveSearchIndex(index);
+    setSearchSelection((current) => ({
+      start: result.start,
+      length: result.length,
+      token: (current?.token ?? 0) + 1,
+    }));
+  };
+
+  const navigateSearchResults = (direction: 1 | -1) => {
+    if (!searchResults.length) return;
+    const nextIndex =
+      (selectedSearchIndex + direction + searchResults.length) %
+      searchResults.length;
+    selectSearchResult(nextIndex);
+  };
 
   // SEO configuration
   useSeo({
-    title: "Free JSON Formatter & Validator Online – Beautify, Minify & Inspect | DiffViewer",
+    title:
+      "Free JSON Formatter & Validator Online – Beautify, Minify & Inspect | DiffViewer",
     description:
       "Free online JSON formatter, validator, and minifier. Beautify JSON, sort keys, inspect syntax errors with exact line numbers, and compare changes. 100% private in your browser.",
     path: "/json-formatter",
@@ -211,8 +299,18 @@ export default function JsonFormatterPage() {
         {
           "@type": "BreadcrumbList",
           itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Home", item: SITE.url + "/" },
-            { "@type": "ListItem", position: 2, name: "Tools", item: SITE.url + "/tools" },
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "Home",
+              item: SITE.url + "/",
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: "Tools",
+              item: SITE.url + "/tools",
+            },
             {
               "@type": "ListItem",
               position: 3,
@@ -227,12 +325,16 @@ export default function JsonFormatterPage() {
 
   const handleFormat = () => {
     if (!inputJson.trim() || !parseResult.valid) return;
-    setInputJson(formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder));
+    setInputJson(
+      formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder),
+    );
   };
 
   const handleMinify = () => {
     if (!inputJson.trim() || !parseResult.valid) return;
-    setInputJson(minifyJsonData(parseResult.data, sortOrder !== null, sortOrder));
+    setInputJson(
+      minifyJsonData(parseResult.data, sortOrder !== null, sortOrder),
+    );
   };
 
   const handleSortKeys = (order: "asc" | "desc") => {
@@ -252,7 +354,9 @@ export default function JsonFormatterPage() {
 
   const handleDownload = () => {
     if (!inputJson) return;
-    const blob = new Blob([inputJson], { type: "application/json;charset=utf-8" });
+    const blob = new Blob([inputJson], {
+      type: "application/json;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -280,7 +384,12 @@ export default function JsonFormatterPage() {
   const handleSendToDiff = () => {
     const formattedForDiff =
       inputJson.trim() && parseResult.valid
-        ? formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder)
+        ? formatJsonData(
+            parseResult.data,
+            indent,
+            sortOrder !== null,
+            sortOrder,
+          )
         : inputJson;
     try {
       sessionStorage.setItem("dv_diff_left", inputJson);
@@ -319,12 +428,6 @@ export default function JsonFormatterPage() {
     },
     { label: "Load Sample", Icon: RotateCcw, onSelect: handleLoadSample },
     {
-      label: "Compare in Diff",
-      Icon: GitCompare,
-      onSelect: handleSendToDiff,
-      disabled: !inputJson.trim(),
-    },
-    {
       label: "Clear All",
       Icon: Trash2,
       onSelect: handleClear,
@@ -353,10 +456,56 @@ export default function JsonFormatterPage() {
           <div className="flex items-center justify-between sm:justify-start gap-3">
             <ToolSwitcher currentTool="json" actions={mobileActions} />
           </div>
+        </div>
 
-          {/* Responsive Action Toolbar */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
-            {/* Compare in Diff Tool Button */}
+        {/* Secondary toolbar with document stats, validation, and actions */}
+        <div className="px-3 sm:px-6 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-between text-xs flex-wrap gap-2">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 flex-wrap">
+            <SearchToolbar
+              open={searchOpen}
+              query={searchQuery}
+              resultCount={searchResults.length}
+              activeIndex={selectedSearchIndex}
+              placeholder="Search JSON"
+              status={
+                !inputJson.trim() ? (
+                  <span className="text-muted-foreground">
+                    Ready for JSON input
+                  </span>
+                ) : parseResult.valid ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="size-3.5" />
+                    <span>Valid JSON</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/15 text-destructive border border-destructive/30">
+                    <AlertCircle className="size-3.5" />
+                    <span>Syntax Error</span>
+                    {parseResult.error?.line && (
+                      <span>
+                        (Line {parseResult.error.line}
+                        {parseResult.error.column
+                          ? `, Col ${parseResult.error.column}`
+                          : ""}
+                        )
+                      </span>
+                    )}
+                  </span>
+                )
+              }
+              onOpenChange={setSearchOpen}
+              onQueryChange={(query) => {
+                setSearchQuery(query);
+                setActiveSearchIndex(-1);
+                setSearchSelection(undefined);
+              }}
+              onNavigate={navigateSearchResults}
+              onClose={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+                setSearchSelection(undefined);
+              }}
+            />
             <button
               type="button"
               onClick={handleSendToDiff}
@@ -370,35 +519,38 @@ export default function JsonFormatterPage() {
           </div>
         </div>
 
-        {/* Status / Validation Summary Bar */}
-        <div className="px-3 sm:px-6 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-between text-xs flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            {!inputJson.trim() ? (
-              <span className="text-muted-foreground">Ready for JSON input</span>
-            ) : parseResult.valid ? (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                <CheckCircle2 className="size-3.5" />
-                <span>Valid JSON</span>
+        <SearchResultsPanel
+          open={searchOpen}
+          query={searchQuery}
+          resultCount={searchResults.length}
+        >
+          {searchResults.map((result, index) => (
+            <button
+              key={`${result.start}-${result.value}`}
+              type="button"
+              role="option"
+              aria-selected={selectedSearchIndex === index}
+              onClick={() => selectSearchResult(index)}
+              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors ${
+                selectedSearchIndex === index
+                  ? "bg-primary/15 text-primary"
+                  : "text-foreground hover:bg-accent"
+              }`}
+            >
+              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                {result.line}
               </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/15 text-destructive border border-destructive/30">
-                <AlertCircle className="size-3.5" />
-                <span>Syntax Error</span>
-                {parseResult.error?.line && (
-                  <span>
-                    (Line {parseResult.error.line}
-                    {parseResult.error.column ? `, Col ${parseResult.error.column}` : ""})
-                  </span>
-                )}
+              <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                {result.value}
               </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 text-muted-foreground font-mono text-[11px]">
-            <span>{inputJson.split("\n").length.toLocaleString()} lines</span>
-            <span>{inputJson.length.toLocaleString()} characters</span>
-          </div>
-        </div>
+              {result.fuzzy && (
+                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
+                  Closest
+                </span>
+              )}
+            </button>
+          ))}
+        </SearchResultsPanel>
 
         {/* Single editable JSON document */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 bg-background min-h-[500px]">
@@ -409,7 +561,9 @@ export default function JsonFormatterPage() {
             onChange={setInputJson}
             placeholder="Paste or type JSON here..."
             errorLine={parseResult.error?.line}
-            searchable
+            errorColumn={parseResult.error?.column}
+            errorLength={parseResult.error?.length}
+            selectionRequest={searchSelection}
             extraHeaderActions={
               <>
                 <label
@@ -475,12 +629,14 @@ export default function JsonFormatterPage() {
             {/* Section Header */}
             <div className="text-center space-y-3">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                Online JSON Formatter &amp; Validator – Private, Fast &amp; Accurate
+                Online JSON Formatter &amp; Validator – Private, Fast &amp;
+                Accurate
               </h2>
               <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Beautify nested payloads, strip whitespace with minification, recursively sort object
-                keys, and instantly pinpoint syntax errors. Everything runs 100% inside your browser
-                for zero data exposure.
+                Beautify nested payloads, strip whitespace with minification,
+                recursively sort object keys, and instantly pinpoint syntax
+                errors. Everything runs 100% inside your browser for zero data
+                exposure.
               </p>
             </div>
 
@@ -492,7 +648,8 @@ export default function JsonFormatterPage() {
                   <span>Custom Formatting</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Choose between 2 spaces, 4 spaces, or tab indentation to match your codebase styling.
+                  Choose between 2 spaces, 4 spaces, or tab indentation to match
+                  your codebase styling.
                 </p>
               </div>
 
@@ -502,7 +659,8 @@ export default function JsonFormatterPage() {
                   <span>Recursive Key Sorting</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Order object keys alphabetically without reordering arrays for deterministic, reliable diffs.
+                  Order object keys alphabetically without reordering arrays for
+                  deterministic, reliable diffs.
                 </p>
               </div>
 
@@ -512,7 +670,8 @@ export default function JsonFormatterPage() {
                   <span>Diff Tool Integration</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Easily send raw and formatted JSON directly to DiffViewer to inspect differences line by line.
+                  Easily send raw and formatted JSON directly to DiffViewer to
+                  inspect differences line by line.
                 </p>
               </div>
             </div>
@@ -530,8 +689,12 @@ export default function JsonFormatterPage() {
                     key={f.q}
                     className="p-4 rounded-xl border border-border/70 bg-card text-card-foreground shadow-2xs space-y-1.5"
                   >
-                    <div className="font-medium text-xs text-foreground">{f.q}</div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{f.a}</p>
+                    <div className="font-medium text-xs text-foreground">
+                      {f.q}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {f.a}
+                    </p>
                   </div>
                 ))}
               </div>

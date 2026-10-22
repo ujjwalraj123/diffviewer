@@ -25,6 +25,8 @@ export interface CodeEditorPaneProps {
   placeholder: string
   readOnly?: boolean
   errorLine?: number | null
+  errorColumn?: number | null
+  errorLength?: number
   statusBadge?: ReactNode
   extraHeaderActions?: ReactNode
   footer?: ReactNode
@@ -40,6 +42,8 @@ export function CodeEditorPane({
   placeholder,
   readOnly = false,
   errorLine,
+  errorColumn,
+  errorLength = 1,
   statusBadge,
   extraHeaderActions,
   footer,
@@ -48,6 +52,7 @@ export function CodeEditorPane({
 }: CodeEditorPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const gutterRef = useRef<HTMLDivElement>(null)
+  const errorHighlightRef = useRef<HTMLSpanElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -63,6 +68,9 @@ export function CodeEditorPane({
   const handleScroll = () => {
     if (textareaRef.current && gutterRef.current) {
       gutterRef.current.scrollTop = textareaRef.current.scrollTop
+    }
+    if (textareaRef.current && errorHighlightRef.current) {
+      errorHighlightRef.current.style.transform = `translate(${-textareaRef.current.scrollLeft}px, ${-textareaRef.current.scrollTop}px)`
     }
   }
 
@@ -343,6 +351,20 @@ export function CodeEditorPane({
             )
           })}
         </div>
+
+        {errorLine && errorColumn && (
+          <span
+            ref={errorHighlightRef}
+            aria-hidden="true"
+            className="absolute z-0 pointer-events-none rounded-sm bg-destructive/35 ring-1 ring-inset ring-destructive/80"
+            style={{
+              left: `calc(3rem + 0.75rem + ${errorColumn - 1}ch)`,
+              top: `${12 + (errorLine - 1) * 20}px`,
+              width: `${Math.max(errorLength, 1)}ch`,
+              height: "20px",
+            }}
+          />
+        )}
 
         {/* Text Area */}
         <textarea
