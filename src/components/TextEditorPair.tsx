@@ -1,43 +1,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { CopyButton } from './CopyButton'
 import { ClipboardPaste, Trash2, FileText, Search, ChevronUp, ChevronDown, X } from 'lucide-react'
-
-interface SearchMatch {
-  start: number
-  length: number
-  line: number
-  value: string
-  fuzzy: boolean
-}
-
-function getEditDistance(left: string, right: string, limit: number): number {
-  const leftChars = Array.from(left)
-  const rightChars = Array.from(right)
-  if (Math.abs(leftChars.length - rightChars.length) > limit) return limit + 1
-
-  let previousRow = Array.from({ length: rightChars.length + 1 }, (_, index) => index)
-  for (let leftIndex = 1; leftIndex <= leftChars.length; leftIndex += 1) {
-    const currentRow = [leftIndex]
-    let rowMinimum = leftIndex
-
-    for (let rightIndex = 1; rightIndex <= rightChars.length; rightIndex += 1) {
-      const substitutionCost =
-        leftChars[leftIndex - 1] === rightChars[rightIndex - 1] ? 0 : 1
-      const distance = Math.min(
-        currentRow[rightIndex - 1] + 1,
-        previousRow[rightIndex] + 1,
-        previousRow[rightIndex - 1] + substitutionCost,
-      )
-      currentRow.push(distance)
-      rowMinimum = Math.min(rowMinimum, distance)
-    }
-
-    if (rowMinimum > limit) return limit + 1
-    previousRow = currentRow
-  }
-
-  return previousRow[rightChars.length]
-}
+import { findTextMatches } from '../lib/utils'
 
 interface TextEditorPairProps {
   left: string
@@ -45,6 +9,12 @@ interface TextEditorPairProps {
   onLeftChange: (v: string) => void
   onRightChange: (v: string) => void
   dark?: boolean
+  searchSelection?: {
+    side: 'original' | 'modified'
+    start: number
+    length: number
+    token: number
+  } | null
 }
 
 export interface CodeEditorPaneProps {
@@ -59,6 +29,7 @@ export interface CodeEditorPaneProps {
   extraHeaderActions?: ReactNode
   footer?: ReactNode
   searchable?: boolean
+  selectionRequest?: { start: number; length: number; token: number } | undefined
 }
 
 export function CodeEditorPane({
@@ -73,6 +44,7 @@ export function CodeEditorPane({
   extraHeaderActions,
   footer,
   searchable = false,
+  selectionRequest,
 }: CodeEditorPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const gutterRef = useRef<HTMLDivElement>(null)
@@ -83,70 +55,7 @@ export function CodeEditorPane({
 
   const lines = value.split('\n')
   const lineCount = Math.max(lines.length, 1)
-  const matches = useMemo(() => {
-    if (!searchQuery) return []
-    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const expression = new RegExp(escapedQuery, 'giu')
-    const found: SearchMatch[] = []
-    let line = 1
-    let lineScanIndex = 0
-    let match: RegExpExecArray | null
-
-    while ((match = expression.exec(value)) !== null) {
-      while (lineScanIndex < match.index) {
-        if (value[lineScanIndex] === '\n') line += 1
-        lineScanIndex += 1
-      }
-      found.push({
-        start: match.index,
-        length: match[0].length,
-        line,
-        value: match[0],
-        fuzzy: false,
-      })
-    }
-
-    if (found.length > 0) return found
-
-    const query = searchQuery.trim().replace(/^["']|["']$/g, '').toLocaleLowerCase()
-    const queryLength = Array.from(query).length
-    if (queryLength < 3) return []
-
-    const maxDistance = Math.min(3, Math.max(1, Math.floor(queryLength * 0.25)))
-    const tokenExpression = /[\p{L}\p{N}_-]+/gu
-    const fuzzyMatches: Array<SearchMatch & { distance: number }> = []
-    let closestDistance = maxDistance + 1
-    line = 1
-    lineScanIndex = 0
-
-    while ((match = tokenExpression.exec(value)) !== null) {
-      while (lineScanIndex < match.index) {
-        if (value[lineScanIndex] === '\n') line += 1
-        lineScanIndex += 1
-      }
-
-      const distance = getEditDistance(
-        query,
-        match[0].toLocaleLowerCase(),
-        maxDistance,
-      )
-      if (distance > maxDistance || distance > closestDistance) continue
-      if (distance < closestDistance) {
-        closestDistance = distance
-        fuzzyMatches.length = 0
-      }
-      fuzzyMatches.push({
-        start: match.index,
-        length: match[0].length,
-        line,
-        value: match[0],
-        fuzzy: true,
-        distance,
-      })
-    }
-
-    return fuzzyMatches.map(({ distance: _distance, ...result }) => result)
-  }, [searchQuery, value])
+  const matches = useMemo(() => findTextMatches(value, searchQuery), [searchQuery, value])
   const selectedMatchIndex =
     matches.length > 0 ? activeMatchIndex % matches.length : -1
 
@@ -218,6 +127,21 @@ export function CodeEditorPane({
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea || !selectionRequest) return
+    textarea.focus()
+    textarea.setSelectionRange(
+      selectionRequest.start,
+      selectionRequest.start + selectionRequest.length,
+    )
+    textarea.scrollTop = Math.max(
+      0,
+      (value.slice(0, selectionRequest.start).split('\n').length - 1) * 20 -
+        textarea.clientHeight / 2,
+    )
+  }, [selectionRequest, value])
 
   useEffect(() => {
     handleScroll()
@@ -383,9 +307,7 @@ export function CodeEditorPane({
                     : 'text-foreground hover:bg-accent'
                 }`}
               >
-                <span className="font-sans font-medium text-muted-foreground">
-                  Line {match.line}
-                </span>
+                <span className="font-sans font-medium text-muted-foreground">{match.line}</span>
                 <span className="px-1.5 text-muted-foreground">—</span>
                 <span>{match.value}</span>
                 {match.fuzzy && (
@@ -450,6 +372,7 @@ export function TextEditorPair({
   right,
   onLeftChange,
   onRightChange,
+  searchSelection,
 }: TextEditorPairProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-[500px] p-4">
@@ -459,6 +382,9 @@ export function TextEditorPair({
         value={left}
         onChange={onLeftChange}
         placeholder="Paste or type original text here..."
+        selectionRequest={
+          searchSelection?.side === 'original' ? searchSelection : undefined
+        }
       />
 
       <CodeEditorPane
@@ -467,6 +393,9 @@ export function TextEditorPair({
         value={right}
         onChange={onRightChange}
         placeholder="Paste or type modified text here..."
+        selectionRequest={
+          searchSelection?.side === 'modified' ? searchSelection : undefined
+        }
       />
     </div>
   )

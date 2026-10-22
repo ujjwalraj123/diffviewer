@@ -22,6 +22,14 @@ import { cn } from "@/lib/utils";
 type DiffLineType = "add" | "del" | "normal" | "marker";
 
 export type DiffEditableSide = "old" | "new";
+export type DiffSearchSide = "original" | "modified";
+
+export interface DiffSearchSelection {
+  side: DiffSearchSide;
+  line: number;
+  column: number;
+  length: number;
+}
 
 export interface DiffCharSegment {
   text: string;
@@ -480,14 +488,26 @@ function DiffViewerHeader({
 interface DiffViewerLineProps extends ComponentProps<"div"> {
   line: ParsedLine;
   showLineNumbers?: boolean | undefined;
+  searchSelection?: DiffSearchSelection | undefined;
 }
 
 function DiffViewerLine({
   line,
   showLineNumbers = true,
+  searchSelection,
   className,
   ...props
 }: DiffViewerLineProps) {
+  const lineNumber =
+    searchSelection?.side === "original"
+      ? line.oldLineNumber
+      : line.newLineNumber;
+  const selected =
+    searchSelection !== undefined &&
+    lineNumber === searchSelection.line &&
+    (line.type === "normal" ||
+      (searchSelection.side === "original" && line.type === "del") ||
+      (searchSelection.side === "modified" && line.type === "add"));
   const indicator =
     line.type === "add"
       ? "+"
@@ -501,7 +521,12 @@ function DiffViewerLine({
     <div
       data-slot="diff-viewer-line"
       data-type={line.type}
-      className={cn(diffLineVariants({ type: line.type }), className)}
+      data-search-result={selected ? searchSelection.side : undefined}
+      className={cn(
+        diffLineVariants({ type: line.type }),
+        selected && "relative z-10 outline outline-2 outline-amber-400/80",
+        className,
+      )}
       {...props}
     >
       {showLineNumbers && (
@@ -531,62 +556,95 @@ function DiffViewerLine({
         data-slot="diff-viewer-content"
         className="flex-1 pe-3.5 break-all whitespace-pre-wrap"
       >
-        {renderDiffLineContent(line)}
+        {renderDiffLineContent(
+          line,
+          selected
+            ? { start: searchSelection.column, length: searchSelection.length }
+            : undefined,
+        )}
       </span>
     </div>
   );
 }
 
-function renderDiffLineContent(line: ParsedLine | null | undefined) {
+function renderDiffLineContent(
+  line: ParsedLine | null | undefined,
+  matchRange?: { start: number; length: number } | undefined,
+) {
   if (!line) return "";
-  if (!line.charSegments || line.charSegments.length === 0) {
-    return line.content;
-  }
-  return line.charSegments.map((seg, idx) => {
-    if (seg.type === "del") {
-      const isWhitespace = /^\s+$/.test(seg.text);
+  const segments =
+    line.charSegments && line.charSegments.length > 0
+      ? line.charSegments
+      : [{ text: line.content, type: "normal" as const }];
+  let offset = 0;
+
+  return segments.flatMap((segment, segmentIndex) => {
+    const segmentStart = offset;
+    const segmentEnd = offset + segment.text.length;
+    offset = segmentEnd;
+    const cuts = [segmentStart, segmentEnd];
+    if (matchRange) {
+      const matchStart = Math.max(segmentStart, matchRange.start);
+      const matchEnd = Math.min(segmentEnd, matchRange.start + matchRange.length);
+      if (matchStart < matchEnd) cuts.push(matchStart, matchEnd);
+    }
+    cuts.sort((left, right) => left - right);
+
+    return cuts.slice(0, -1).map((partStart, partIndex) => {
+      const partEnd = cuts[partIndex + 1];
+      if (partEnd === undefined || partStart === partEnd) return null;
+      const text = segment.text.slice(partStart - segmentStart, partEnd - segmentStart);
+      const isMatch =
+        matchRange !== undefined &&
+        partStart >= matchRange.start &&
+        partEnd <= matchRange.start + matchRange.length;
+      const isWhitespace = /^\s+$/.test(text);
+      const content = isMatch ? (
+        <mark className="rounded-sm bg-amber-300 text-black dark:bg-amber-400 dark:text-black">
+          {text}
+        </mark>
+      ) : (
+        text
+      );
+
       return (
         <span
-          key={idx}
+          key={`${segmentIndex}-${partIndex}`}
           className={cn(
-            "bg-red-500/25 text-red-700 dark:bg-red-500/35 dark:text-red-200 rounded-[2px] font-semibold",
-            isWhitespace && "inline-block min-w-[0.5ch]"
+            segment.type === "del" &&
+              "bg-red-500/25 text-red-700 dark:bg-red-500/35 dark:text-red-200 rounded-[2px] font-semibold",
+            segment.type === "add" &&
+              "bg-green-500/25 text-green-700 dark:bg-green-500/35 dark:text-green-200 rounded-[2px] font-semibold",
+            segment.type !== "normal" && isWhitespace && "inline-block min-w-[0.5ch]",
           )}
         >
-          {seg.text}
+          {content}
         </span>
       );
-    }
-    if (seg.type === "add") {
-      const isWhitespace = /^\s+$/.test(seg.text);
-      return (
-        <span
-          key={idx}
-          className={cn(
-            "bg-green-500/25 text-green-700 dark:bg-green-500/35 dark:text-green-200 rounded-[2px] font-semibold",
-            isWhitespace && "inline-block min-w-[0.5ch]"
-          )}
-        >
-          {seg.text}
-        </span>
-      );
-    }
-    return <span key={idx}>{seg.text}</span>;
+    });
   });
 }
 
 interface DiffViewerSplitLineProps extends ComponentProps<"div"> {
   pair: SplitLinePair;
   showLineNumbers?: boolean | undefined;
+  searchSelection?: DiffSearchSelection | undefined;
 }
 
 function DiffViewerSplitLine({
   pair,
   showLineNumbers = true,
+  searchSelection,
   className,
   ...props
 }: DiffViewerSplitLineProps) {
   const { left, right } = pair;
+  const leftSelected =
+    searchSelection?.side === "original" &&
+    left?.oldLineNumber === searchSelection.line;
+  const rightSelected =
+    searchSelection?.side === "modified" &&
+    right?.newLineNumber === searchSelection.line;
 
   return (
     <div
@@ -597,9 +655,11 @@ function DiffViewerSplitLine({
       <div
         data-slot="diff-viewer-split-left"
         data-type={left?.type ?? "empty"}
+        data-search-result={leftSelected ? "original" : undefined}
         className={cn(
           "border-foreground/10 flex w-1/2 border-e",
           diffLineVariants({ type: left?.type ?? "empty" }),
+          leftSelected && "relative z-10 outline outline-2 outline-amber-400/80",
         )}
       >
         {showLineNumbers && (
@@ -622,15 +682,22 @@ function DiffViewerSplitLine({
             : ""}
         </span>
         <span className="flex-1 pe-3.5 break-all whitespace-pre-wrap">
-          {renderDiffLineContent(left)}
+          {renderDiffLineContent(
+            left,
+            leftSelected
+              ? { start: searchSelection.column, length: searchSelection.length }
+              : undefined,
+          )}
         </span>
       </div>
       <div
         data-slot="diff-viewer-split-right"
         data-type={right?.type ?? "empty"}
+        data-search-result={rightSelected ? "modified" : undefined}
         className={cn(
           "flex w-1/2",
           diffLineVariants({ type: right?.type ?? "empty" }),
+          rightSelected && "relative z-10 outline outline-2 outline-amber-400/80",
         )}
       >
         {showLineNumbers && (
@@ -653,7 +720,12 @@ function DiffViewerSplitLine({
             : ""}
         </span>
         <span className="flex-1 pe-3.5 break-all whitespace-pre-wrap">
-          {renderDiffLineContent(right)}
+          {renderDiffLineContent(
+            right,
+            rightSelected
+              ? { start: searchSelection.column, length: searchSelection.length }
+              : undefined,
+          )}
         </span>
       </div>
     </div>
@@ -669,6 +741,7 @@ interface DiffViewerFileContentProps {
   showStats: boolean;
   copyable: boolean;
   maxCollapsedLines: number | undefined;
+  searchSelection: DiffSearchSelection | undefined;
 }
 
 function DiffViewerFileContent({
@@ -680,6 +753,7 @@ function DiffViewerFileContent({
   showStats,
   copyable,
   maxCollapsedLines,
+  searchSelection,
 }: DiffViewerFileContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentId = useId();
@@ -713,6 +787,7 @@ function DiffViewerFileContent({
                   key={pairIndex}
                   pair={pair}
                   showLineNumbers={showLineNumbers}
+                  searchSelection={searchSelection}
                 />
               ))
           : file.lines
@@ -722,6 +797,7 @@ function DiffViewerFileContent({
                   key={lineIndex}
                   line={line}
                   showLineNumbers={showLineNumbers}
+                  searchSelection={searchSelection}
                 />
               ))}
       </DiffViewerContent>
@@ -752,6 +828,9 @@ interface DiffEditablePaneProps {
   /** Called with the new full text whenever the user edits this pane. */
   onChange: (next: string) => void;
   placeholder?: string | undefined;
+  searchSelection?:
+    | { start: number; length: number; line: number; column: number; token: number }
+    | undefined;
 }
 
 /**
@@ -769,6 +848,7 @@ function DiffEditablePane({
   counterpart,
   onChange,
   placeholder,
+  searchSelection,
 }: DiffEditablePaneProps) {
   const highlightRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -822,6 +902,22 @@ function DiffEditablePane({
     return () => observer.disconnect();
   }, [syncHighlight]);
 
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !searchSelection) return;
+    textarea.focus();
+    textarea.setSelectionRange(
+      searchSelection.start,
+      searchSelection.start + searchSelection.length,
+    );
+    textarea.scrollTop = Math.max(
+      0,
+      (value.slice(0, searchSelection.start).split(/\r\n|\r|\n/).length - 1) *
+        20 -
+        textarea.clientHeight / 2,
+    );
+  }, [searchSelection, value]);
+
   return (
     <div className="relative flex-1 min-h-[240px] overflow-hidden">
       {/* Colored, read-only layer (underneath) */}
@@ -838,16 +934,33 @@ function DiffEditablePane({
             <div
               key={idx}
               data-type={line.type}
+              data-search-result={
+                searchSelection?.line === idx + 1
+                  ? side === "old"
+                    ? "original"
+                    : "modified"
+                  : undefined
+              }
               className={cn(
                 "-mx-3.5 px-3.5",
                 "w-full",
                 "min-h-[20px]",
                 diffLineVariants({ type: line.type }),
                 diffLineTextVariants({ type: line.type }),
+                searchSelection?.line === idx + 1 &&
+                  "bg-amber-300/20 outline outline-1 outline-amber-400/80",
                 "block",
               )}
             >
-              {renderDiffLineContent(line) || "\u200b"}
+              {renderDiffLineContent(
+                line,
+                searchSelection?.line === idx + 1
+                  ? {
+                      start: searchSelection.column,
+                      length: searchSelection.length,
+                    }
+                  : undefined,
+              ) || "\u200b"}
             </div>
           ))
         )}
@@ -883,6 +996,7 @@ export type DiffViewerProps = Partial<SyntaxHighlighterProps> &
     copyable?: boolean | undefined;
     maxCollapsedLines?: number | undefined;
     className?: string | undefined;
+    searchSelection?: DiffSearchSelection | undefined;
   };
 
 function DiffViewer({
@@ -896,10 +1010,12 @@ function DiffViewer({
   showStats = true,
   copyable = true,
   maxCollapsedLines,
+  searchSelection,
   variant,
   size,
   className,
 }: DiffViewerProps) {
+  const viewerRef = useRef<HTMLDivElement>(null);
   const diffPatch = patch ?? code;
   const oldContent = oldFile?.content;
   const oldName = oldFile?.name;
@@ -934,6 +1050,14 @@ function DiffViewer({
     return parsedFiles.map((file) => pairLinesForSplit(file.lines));
   }, [parsedFiles, viewMode]);
 
+  useEffect(() => {
+    if (!searchSelection) return;
+    const target = viewerRef.current?.querySelector<HTMLElement>(
+      `[data-search-result="${searchSelection.side}"]`,
+    );
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [searchSelection, viewMode, parsedFiles]);
+
   if (parsedFiles.length === 0) {
     return (
       <pre
@@ -954,6 +1078,7 @@ function DiffViewer({
       data-view-mode={viewMode}
       data-variant={variant ?? "default"}
       data-size={size ?? "default"}
+      ref={viewerRef}
       className={cn(diffViewerVariants({ variant, size }), className)}
     >
       {parsedFiles.map((file, fileIndex) => (
@@ -967,6 +1092,7 @@ function DiffViewer({
           showStats={showStats}
           copyable={copyable}
           maxCollapsedLines={maxCollapsedLines}
+          searchSelection={searchSelection}
         />
       ))}
     </div>

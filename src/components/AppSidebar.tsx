@@ -33,7 +33,6 @@ export interface AppSidebarProps {
   onClear?: () => void;
   onSwap?: () => void;
   onResetSample?: () => void;
-  onEnterDiff?: () => void;
   diffEditable?: boolean;
   onToggleDiffEditable?: () => void;
   dark: boolean;
@@ -58,7 +57,6 @@ export function AppSidebar({
   onClear,
   onSwap,
   onResetSample,
-  onEnterDiff,
   diffEditable = false,
   onToggleDiffEditable,
   dark = false,
@@ -82,13 +80,7 @@ export function AppSidebar({
   const isFaq = currentPath === "/faq";
   const isBlog = currentPath.startsWith("/blog");
 
-  const handleDiffClick = () => {
-    try {
-      localStorage.setItem("dv_has_entered_diff", "true");
-    } catch {
-      /* ignore */
-    }
-    onEnterDiff?.();
+  const handleDiffNavigation = () => {
     setMobileOpen(false);
   };
 
@@ -98,7 +90,7 @@ export function AppSidebar({
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border sticky top-0 z-40">
         <Link
           to="/"
-          onClick={handleDiffClick}
+          onClick={handleDiffNavigation}
           className="flex items-center gap-2.5 font-bold text-foreground"
         >
           <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
@@ -152,7 +144,7 @@ export function AppSidebar({
         <div className="h-16 min-h-16 shrink-0 p-4 border-b border-sidebar-border/70 flex items-center justify-between">
           <Link
             to="/"
-            onClick={handleDiffClick}
+            onClick={handleDiffNavigation}
             className="flex items-center gap-2.5 group cursor-pointer"
           >
             <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
@@ -208,7 +200,7 @@ export function AppSidebar({
                 <nav className="space-y-1 pl-1" aria-label="Tools Navigation">
                   <Link
                     to="/"
-                    onClick={handleDiffClick}
+                    onClick={handleDiffNavigation}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                       isDiffTool
                         ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-2xs"
@@ -300,7 +292,7 @@ export function AppSidebar({
                     type="button"
                     onClick={() => {
                       onModeChange("diff");
-                      handleDiffClick();
+                      handleDiffNavigation();
                     }}
                     className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
                       mode === "diff"

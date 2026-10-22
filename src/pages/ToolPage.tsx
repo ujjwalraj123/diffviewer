@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { ToolSwitcher } from "../components/ToolSwitcher";
-import { TextEditorPair } from "../components/TextEditorPair";
+import {
+  TextEditorPair,
+} from "../components/TextEditorPair";
+import { findTextMatches, type TextSearchMatch } from "../lib/utils";
 import { CopyButton } from "../components/CopyButton";
-import { DiffViewer, DiffEditablePane } from "@/components/ui/diff-viewer";
+import {
+  DiffViewer,
+  DiffEditablePane,
+  type DiffSearchSide,
+} from "@/components/ui/diff-viewer";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
@@ -18,7 +25,20 @@ import {
   Info,
   ArrowLeftRight,
   Trash2,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from "lucide-react";
+
+interface DiffSearchResult extends TextSearchMatch {
+  side: DiffSearchSide;
+}
+
+interface DiffSearchSelection extends DiffSearchResult {
+  column: number;
+  token: number;
+}
 /*
 const SAMPLE_LEFT = `function greet(name) {
   return "Hello, " + name;
@@ -49,6 +69,12 @@ export default function ToolPage() {
     return "edit";
   });
   const [diffViewMode, setDiffViewMode] = useState<"split" | "unified">("split");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
+  const [searchSelection, setSearchSelection] =
+    useState<DiffSearchSelection | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // When true, the diff view becomes editable in place (Diff Editor action).
   const [diffEditable, setDiffEditable] = useState(false);
   const [left, setLeft] = useState(() => {
@@ -77,30 +103,8 @@ export default function ToolPage() {
   });
   const { dark, toggle } = useTheme();
 
-  // Persistent workflow state
-  const [hasEnteredDiff, setHasEnteredDiff] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("dv_has_entered_diff") === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  const markEnteredDiff = () => {
-    try {
-      localStorage.setItem("dv_has_entered_diff", "true");
-    } catch {
-      // Ignore storage errors
-    }
-    setHasEnteredDiff(true);
-  };
-
   const handleModeChange = (newMode: "edit" | "diff") => {
     setMode(newMode);
-
-    if (newMode === "diff") {
-      markEnteredDiff();
-    }
   };
 
   useSeo({
@@ -160,6 +164,53 @@ export default function ToolPage() {
     right.length > 0 &&
     normalizeForCompare(left) === normalizeForCompare(right);
   const isBothEmpty = left.trim().length === 0 && right.trim().length === 0;
+  const searchResults = useMemo(() => {
+    if (!searchQuery) return [];
+    const results: DiffSearchResult[] = [
+      ...findTextMatches(left, searchQuery).map((match) => ({
+        ...match,
+        side: "original" as const,
+      })),
+      ...findTextMatches(right, searchQuery).map((match) => ({
+        ...match,
+        side: "modified" as const,
+      })),
+    ];
+    const exactResults = results.filter((result) => !result.fuzzy);
+    return exactResults.length > 0 ? exactResults : results;
+  }, [left, right, searchQuery]);
+  const selectedSearchIndex =
+    searchResults.length > 0 ? activeSearchIndex % searchResults.length : -1;
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const selectSearchResult = (index: number) => {
+    const result = searchResults[index];
+    if (!result) return;
+    const source = result.side === "original" ? left : right;
+    const lineStart = source.lastIndexOf("\n", result.start - 1) + 1;
+    setActiveSearchIndex(index);
+    setSearchSelection({
+      ...result,
+      column: result.start - lineStart,
+      token: (searchSelection?.token ?? 0) + 1,
+    });
+  };
+
+  const navigateSearchResults = (direction: 1 | -1) => {
+    if (searchResults.length === 0) return;
+    const startIndex =
+      activeSearchIndex >= 0 && activeSearchIndex < searchResults.length
+        ? activeSearchIndex
+        : direction === 1
+          ? -1
+          : 0;
+    selectSearchResult(
+      (startIndex + direction + searchResults.length) % searchResults.length,
+    );
+  };
 
   return (
     <AppLayout
@@ -170,7 +221,6 @@ export default function ToolPage() {
       onClear={handleClear}
       onSwap={handleSwap}
       // onResetSample={handleResetSample}
-      onEnterDiff={markEnteredDiff}
       diffEditable={diffEditable}
       onToggleDiffEditable={() => setDiffEditable((v) => !v)}
       dark={dark}
@@ -209,7 +259,7 @@ export default function ToolPage() {
           </div>
 
           {/* Mode switcher and responsive view controls */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          <div className="relative flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
             {/* Edit / Diff View tabs */}
             <div className="inline-flex sm:hidden items-center p-1 bg-muted rounded-lg border border-border/60">
               <button
@@ -262,8 +312,140 @@ export default function ToolPage() {
                 <span>Unified</span>
               </button>
             </div>
+
+            <div className="relative flex items-center gap-1">
+              {searchOpen ? (
+                <>
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setActiveSearchIndex(-1);
+                      setSearchSelection(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        navigateSearchResults(event.shiftKey ? -1 : 1);
+                      } else if (event.key === "Escape") {
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                        setSearchSelection(null);
+                      }
+                    }}
+                    placeholder="Search both files"
+                    aria-label="Search original and modified text"
+                    className="h-8 w-32 sm:w-44 rounded-md border border-border/60 bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                  <span
+                    aria-live="polite"
+                    className="min-w-8 text-center text-[10px] font-mono text-muted-foreground tabular-nums"
+                  >
+                    {searchQuery ? `${selectedSearchIndex + 1}/${searchResults.length}` : "0/0"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigateSearchResults(-1)}
+                    disabled={!searchResults.length}
+                    title="Previous result (Shift+Enter)"
+                    aria-label="Previous search result"
+                    className="inline-flex size-7 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    <ChevronUp className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateSearchResults(1)}
+                    disabled={!searchResults.length}
+                    title="Next result (Enter)"
+                    aria-label="Next search result"
+                    className="inline-flex size-7 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchQuery("");
+                      setSearchSelection(null);
+                    }}
+                    title="Close search"
+                    aria-label="Close search"
+                    className="inline-flex size-7 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  title="Search both files (Ctrl+F)"
+                  aria-label="Search both files"
+                  className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Search className="size-3.5" />
+                </button>
+              )}
+
+            </div>
           </div>
         </div>
+
+        {searchOpen && searchQuery && (
+          <div
+            role="listbox"
+            aria-label="Diff search results"
+            className="max-h-48 shrink-0 overflow-y-auto border-b border-border/60 bg-muted/20 px-3 py-1.5 sm:px-6"
+          >
+            {searchResults.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground" role="status">
+                No results found
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5">
+                {searchResults.map((result, index) => (
+                  <button
+                    key={`${result.side}-${result.start}-${result.value}`}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedSearchIndex === index}
+                    onClick={() => selectSearchResult(index)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors ${
+                      selectedSearchIndex === index
+                        ? "bg-primary/15 text-primary"
+                        : "text-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <span
+                      className={`shrink-0 rounded px-1.5 py-0.5 font-sans text-[10px] font-semibold ${
+                        result.side === "original"
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {result.side === "original" ? "Original" : "Modified"}
+                    </span>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                      {result.line}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                      {result.value}
+                    </span>
+                    {result.fuzzy && (
+                      <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
+                        Closest
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main work area */}
         <div
@@ -278,6 +460,7 @@ export default function ToolPage() {
               onLeftChange={setLeft}
               onRightChange={setRight}
               dark={dark}
+              searchSelection={searchSelection}
             />
           ) : (
             <div
@@ -304,6 +487,11 @@ export default function ToolPage() {
                       counterpart={right}
                       onChange={setLeft}
                       placeholder="Original text…"
+                      searchSelection={
+                        searchSelection?.side === "original"
+                          ? searchSelection
+                          : undefined
+                      }
                     />
                   </div>
 
@@ -324,6 +512,11 @@ export default function ToolPage() {
                       counterpart={left}
                       onChange={setRight}
                       placeholder="Modified text…"
+                      searchSelection={
+                        searchSelection?.side === "modified"
+                          ? searchSelection
+                          : undefined
+                      }
                     />
                   </div>
                 </div>
@@ -381,6 +574,16 @@ export default function ToolPage() {
                     showStats={true}
                     copyable={true}
                     variant="default"
+                    searchSelection={
+                      searchSelection
+                        ? {
+                            side: searchSelection.side,
+                            line: searchSelection.line,
+                            column: searchSelection.column,
+                            length: searchSelection.length,
+                          }
+                        : undefined
+                    }
                   />
                 </div>
               )}
@@ -388,50 +591,47 @@ export default function ToolPage() {
           )}
         </div>
 
-        {/* Initial visit FAQ section */}
-        {!hasEnteredDiff && (
-          <section
-            aria-label="About DiffViewer and FAQs"
-            className="border-t border-border/60 bg-muted/20 px-6 py-12"
-          >
-            <div className="max-w-4xl mx-auto space-y-10">
-              <div className="text-center space-y-3">
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  Online Diff Checker – Fast, Private &amp; Character-Accurate
-                </h2>
-                <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                  DiffViewer compares text, code, JSON, and documents side by
-                  side with instant character-level highlighting. Everything
-                  runs 100% in your browser for total privacy and speed.
-                </p>
+        <section
+          aria-label="About DiffViewer and FAQs"
+          className="border-t border-border/60 bg-muted/20 px-6 py-12"
+        >
+          <div className="max-w-4xl mx-auto space-y-10">
+            <div className="text-center space-y-3">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                Online Diff Checker – Fast, Private &amp; Character-Accurate
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                DiffViewer compares text, code, JSON, and documents side by
+                side with instant character-level highlighting. Everything
+                runs 100% in your browser for total privacy and speed.
+              </p>
+            </div>
+
+            {/* FAQ cards */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-foreground font-semibold text-base">
+                <HelpCircle className="size-4 text-primary" />
+                <h3>Frequently Asked Questions</h3>
               </div>
 
-              {/* FAQ cards */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-foreground font-semibold text-base">
-                  <HelpCircle className="size-4 text-primary" />
-                  <h3>Frequently Asked Questions</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {FAQS.map((f) => (
-                    <div
-                      key={f.q}
-                      className="p-4 rounded-xl border border-border/70 bg-card text-card-foreground shadow-2xs space-y-1.5"
-                    >
-                      <div className="font-medium text-xs text-foreground">
-                        {f.q}
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {f.a}
-                      </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {FAQS.map((f) => (
+                  <div
+                    key={f.q}
+                    className="p-4 rounded-xl border border-border/70 bg-card text-card-foreground shadow-2xs space-y-1.5"
+                  >
+                    <div className="font-medium text-xs text-foreground">
+                      {f.q}
                     </div>
-                  ))}
-                </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {f.a}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
       </div>
     </AppLayout>
   );
