@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { ToolSwitcher } from "../components/ToolSwitcher";
 import type { MobileHeaderAction } from "../components/MobileActionsMenu";
@@ -7,13 +7,6 @@ import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
 import { navigate } from "../lib/router";
-import {
-  parseJsonWithError,
-  formatJsonData,
-  minifyJsonData,
-  SAMPLE_JSON,
-  type IndentType,
-} from "../lib/jsonFormatter";
 import { JSON_FAQS } from "../content/faqs";
 import {
   Sparkles,
@@ -31,39 +24,161 @@ import {
   Code2,
 } from "lucide-react";
 
+interface JsonParseResult {
+  valid: boolean;
+  data?: unknown;
+  error?: {
+    message: string;
+    line?: number;
+    column?: number;
+    excerpt?: string;
+  };
+}
+
+type IndentType = 2 | 4 | "tab" | 1;
+
+const SAMPLE_JSON = `{
+  "tool": "DiffViewer",
+  "feature": "JSON Formatter & Validator",
+  "version": "1.0.0",
+  "active": true,
+  "privacy": {
+    "clientSide": true,
+    "serverUpload": false,
+    "encryption": "in-memory-only"
+  },
+  "capabilities": [
+    "format-and-beautify",
+    "minify-and-compact",
+    "sort-keys-alphabetically",
+    "real-time-syntax-validation",
+    "instant-diff-comparison"
+  ],
+  "stats": {
+    "speedMs": 0,
+    "accuracy": "100%",
+    "supportedFormats": ["json", "geojson", "jsonld", "ndjson"]
+  }
+}`;
+
+function parseJsonWithError(raw: string): JsonParseResult {
+  if (!raw.trim()) {
+    return { valid: true, data: null };
+  }
+
+  try {
+    return { valid: true, data: JSON.parse(raw) };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    let line: number | undefined;
+    let column: number | undefined;
+
+    const lineColumnMatch = message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+    if (lineColumnMatch) {
+      line = Number(lineColumnMatch[1]);
+      column = Number(lineColumnMatch[2]);
+    } else {
+      const positionMatch = message.match(/position\s+(\d+)/i);
+      if (positionMatch) {
+        const beforeError = raw.slice(0, Number(positionMatch[1]));
+        const precedingLines = beforeError.split("\n");
+        line = precedingLines.length;
+        column = precedingLines[precedingLines.length - 1].length + 1;
+      } else {
+        const lineMatch = message.match(/line\s+(\d+)/i);
+        if (lineMatch) line = Number(lineMatch[1]);
+      }
+    }
+
+    let excerpt: string | undefined;
+    if (line !== undefined) {
+      const sourceLine = raw.split("\n")[line - 1] ?? "";
+      excerpt =
+        column !== undefined
+          ? `${sourceLine}\n${" ".repeat(Math.max(0, column - 1))}^`
+          : sourceLine;
+    }
+
+    return {
+      valid: false,
+      error: { message, line, column, excerpt },
+    };
+  }
+}
+
+function stringifyJsonData(
+  data: unknown,
+  indent: IndentType | 0,
+  sortKeys: boolean,
+  sortOrder: "asc" | "desc" | null = "asc",
+): string {
+  const indentation = indent === "tab" ? "\t" : " ".repeat(indent);
+
+  const stringify = (value: unknown, depth: number): string => {
+    if (Array.isArray(value)) {
+      if (value.length === 0) return "[]";
+      const items = value.map((item) => stringify(item, depth + 1));
+      if (!indentation) return `[${items.join(",")}]`;
+      return `[\n${indentation.repeat(depth + 1)}${items.join(
+        `,\n${indentation.repeat(depth + 1)}`,
+      )}\n${indentation.repeat(depth)}]`;
+    }
+
+    if (value !== null && typeof value === "object") {
+      const keys = Object.keys(value as Record<string, unknown>);
+      if (sortKeys) {
+        keys.sort((left, right) =>
+          sortOrder !== "desc"
+            ? left.localeCompare(right)
+            : right.localeCompare(left),
+        );
+      }
+      if (keys.length === 0) return "{}";
+      const properties = keys.map((key) => {
+        const property = `${JSON.stringify(key)}${
+          indentation ? ": " : ":"
+        }${stringify((value as Record<string, unknown>)[key], depth + 1)}`;
+        return indentation ? `${indentation.repeat(depth + 1)}${property}` : property;
+      });
+      if (!indentation) return `{${properties.join(",")}}`;
+      return `{\n${properties.join(
+        `,\n`,
+      )}\n${indentation.repeat(depth)}}`;
+    }
+
+    return JSON.stringify(value) ?? "null";
+  };
+
+  return stringify(data, 0);
+}
+
+function formatJsonData(
+  data: unknown,
+  indent: IndentType,
+  sortKeys = false,
+  sortOrder: "asc" | "desc" | null = "asc",
+): string {
+  return stringifyJsonData(data, indent, sortKeys, sortOrder);
+}
+
+function minifyJsonData(
+  data: unknown,
+  sortKeys = false,
+  sortOrder: "asc" | "desc" | null = "asc",
+): string {
+  return stringifyJsonData(data, 0, sortKeys, sortOrder);
+}
+
 export default function JsonFormatterPage() {
   const [inputJson, setInputJson] = useState<string>(SAMPLE_JSON);
   const [indent, setIndent] = useState<IndentType>(2);
-  const [sortKeys, setSortKeys] = useState(false);
-  const [viewTab, setViewTab] = useState<"both" | "input" | "output">("both");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
   const { dark, toggle } = useTheme();
 
   // Parse input in real time
   const parseResult = useMemo(() => {
     return parseJsonWithError(inputJson);
   }, [inputJson]);
-
-  // Compute formatted output
-  const formattedOutput = useMemo(() => {
-    if (!inputJson.trim()) return "";
-    if (!parseResult.valid) return "";
-    return formatJsonData(parseResult.data, indent, sortKeys);
-  }, [inputJson, parseResult, indent, sortKeys]);
-
-  // Compute stats
-  const stats = useMemo(() => {
-    const rawLen = inputJson.length;
-    const formattedLen = formattedOutput.length;
-    let diffPercent = 0;
-    if (rawLen > 0 && formattedLen > 0) {
-      diffPercent = Math.round(((formattedLen - rawLen) / rawLen) * 100);
-    }
-    return {
-      rawLen,
-      formattedLen,
-      diffPercent,
-    };
-  }, [inputJson, formattedOutput]);
 
   // SEO configuration
   useSeo({
@@ -111,16 +226,19 @@ export default function JsonFormatterPage() {
   });
 
   const handleFormat = () => {
-    if (parseResult.valid && parseResult.data !== undefined) {
-      const formatted = formatJsonData(parseResult.data, indent, sortKeys);
-      setInputJson(formatted);
-    }
+    if (!inputJson.trim() || !parseResult.valid) return;
+    setInputJson(formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder));
   };
 
   const handleMinify = () => {
-    if (parseResult.valid && parseResult.data !== undefined) {
-      const minified = minifyJsonData(parseResult.data, sortKeys);
-      setInputJson(minified);
+    if (!inputJson.trim() || !parseResult.valid) return;
+    setInputJson(minifyJsonData(parseResult.data, sortOrder !== null, sortOrder));
+  };
+
+  const handleSortKeys = (order: "asc" | "desc") => {
+    setSortOrder(order);
+    if (inputJson.trim() && parseResult.valid) {
+      setInputJson(formatJsonData(parseResult.data, indent, true, order));
     }
   };
 
@@ -133,9 +251,8 @@ export default function JsonFormatterPage() {
   };
 
   const handleDownload = () => {
-    const textToDownload = formattedOutput || inputJson;
-    if (!textToDownload) return;
-    const blob = new Blob([textToDownload], { type: "application/json;charset=utf-8" });
+    if (!inputJson) return;
+    const blob = new Blob([inputJson], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -161,9 +278,13 @@ export default function JsonFormatterPage() {
   };
 
   const handleSendToDiff = () => {
+    const formattedForDiff =
+      inputJson.trim() && parseResult.valid
+        ? formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder)
+        : inputJson;
     try {
       sessionStorage.setItem("dv_diff_left", inputJson);
-      sessionStorage.setItem("dv_diff_right", formattedOutput || inputJson);
+      sessionStorage.setItem("dv_diff_right", formattedForDiff);
       sessionStorage.setItem("dv_diff_auto_mode", "diff");
     } catch {
       // ignore
@@ -185,10 +306,16 @@ export default function JsonFormatterPage() {
       disabled: !parseResult.valid || !inputJson.trim(),
     },
     {
-      label: "Sort Keys",
+      label: "Sort Keys A-Z",
       Icon: ArrowDownAZ,
-      onSelect: () => setSortKeys((value) => !value),
-      active: sortKeys,
+      onSelect: () => handleSortKeys("asc"),
+      active: sortOrder === "asc",
+    },
+    {
+      label: "Sort Keys Z-A",
+      Icon: ArrowDownAZ,
+      onSelect: () => handleSortKeys("desc"),
+      active: sortOrder === "desc",
     },
     { label: "Load Sample", Icon: RotateCcw, onSelect: handleLoadSample },
     {
@@ -206,25 +333,14 @@ export default function JsonFormatterPage() {
     },
   ];
 
-  // Adjust viewTab on screen resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setViewTab("both");
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
     <AppLayout
       dark={dark}
       onToggleDark={toggle}
       jsonIndent={indent}
       onJsonIndentChange={setIndent}
-      jsonSortKeys={sortKeys}
-      onToggleJsonSortKeys={() => setSortKeys((v) => !v)}
+      jsonSortOrder={sortOrder}
+      onJsonSortOrderChange={handleSortKeys}
       onJsonFormat={handleFormat}
       onJsonMinify={handleMinify}
       onJsonLoadSample={handleLoadSample}
@@ -240,43 +356,6 @@ export default function JsonFormatterPage() {
 
           {/* Responsive Action Toolbar */}
           <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
-            {/* Mobile View Switcher (Input vs Output tabs) */}
-            <div className="inline-flex lg:hidden items-center p-1 bg-muted rounded-lg border border-border/60">
-              <button
-                type="button"
-                onClick={() => setViewTab("input")}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  viewTab === "input"
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Input
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewTab("output")}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  viewTab === "output"
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Output
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewTab("both")}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  viewTab === "both"
-                    ? "bg-background text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Both
-              </button>
-            </div>
-
             {/* Compare in Diff Tool Button */}
             <button
               type="button"
@@ -316,118 +395,75 @@ export default function JsonFormatterPage() {
           </div>
 
           <div className="flex items-center gap-3 text-muted-foreground font-mono text-[11px]">
-            {stats.rawLen > 0 && <span>Raw: {stats.rawLen.toLocaleString()} B</span>}
-            {stats.formattedLen > 0 && (
-              <>
-                <span>Formatted: {stats.formattedLen.toLocaleString()} B</span>
-                {stats.diffPercent !== 0 && (
-                  <span
-                    className={
-                      stats.diffPercent > 0
-                        ? "text-amber-500 font-semibold"
-                        : "text-emerald-500 font-semibold"
-                    }
-                  >
-                    ({stats.diffPercent > 0 ? `+${stats.diffPercent}%` : `${stats.diffPercent}%`})
-                  </span>
-                )}
-              </>
-            )}
+            <span>{inputJson.split("\n").length.toLocaleString()} lines</span>
+            <span>{inputJson.length.toLocaleString()} characters</span>
           </div>
         </div>
 
-        {/* Main Work Area: Two-Pane Setup */}
+        {/* Single editable JSON document */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 bg-background min-h-[500px]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 h-full">
-            {/* Left Pane: Raw JSON Input */}
-            <div
-              className={`flex flex-col h-full ${
-                viewTab === "output" ? "hidden lg:flex" : "flex"
-              }`}
-            >
-              <CodeEditorPane
-                title="Input JSON"
-                subTitle="Raw / Editable"
-                value={inputJson}
-                onChange={setInputJson}
-                placeholder="Paste or type raw JSON here..."
-                errorLine={parseResult.error?.line}
-                extraHeaderActions={
-                  <label
-                    title="Upload .json file"
-                    className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-                  >
-                    <Upload className="size-3.5" />
-                    <input
-                      type="file"
-                      accept=".json,application/json,text/plain"
-                      onChange={handleFileUpload}
-                      className="sr-only"
-                    />
-                  </label>
-                }
-                footer={
-                  !parseResult.valid && parseResult.error ? (
-                    <div className="p-3 bg-destructive/10 border-t border-destructive/20 text-xs space-y-1.5 font-mono">
-                      <div className="flex items-start gap-2 text-destructive font-semibold">
-                        <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                        <span className="leading-snug">{parseResult.error.message}</span>
-                      </div>
-                      {parseResult.error.excerpt && (
-                        <pre className="p-2 bg-destructive/15 text-destructive rounded overflow-x-auto text-[11px] leading-tight select-all">
-                          {parseResult.error.excerpt}
-                        </pre>
+          <CodeEditorPane
+            title="JSON Editor"
+            subTitle="Editable"
+            value={inputJson}
+            onChange={setInputJson}
+            placeholder="Paste or type JSON here..."
+            errorLine={parseResult.error?.line}
+            searchable
+            extraHeaderActions={
+              <>
+                <label
+                  title="Upload .json file"
+                  className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+                >
+                  <Upload className="size-3.5" />
+                  <input
+                    type="file"
+                    accept=".json,application/json,text/plain"
+                    onChange={handleFileUpload}
+                    className="sr-only"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={!inputJson}
+                  title="Download current JSON"
+                  aria-label="Download current JSON"
+                  className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                >
+                  <Download className="size-3.5" />
+                </button>
+              </>
+            }
+            footer={
+              !parseResult.valid && parseResult.error ? (
+                <div className="p-3 bg-destructive/10 border-t border-destructive/20 text-xs space-y-1.5 font-mono">
+                  <div className="flex items-start gap-2 text-destructive font-semibold">
+                    <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                    <span className="leading-snug">
+                      {parseResult.error.message}
+                      {parseResult.error.line !== undefined && (
+                        <span>
+                          {" "}
+                          (Line {parseResult.error.line}
+                          {parseResult.error.column !== undefined
+                            ? `, column ${parseResult.error.column}`
+                            : ""}
+                          )
+                        </span>
                       )}
-                    </div>
-                  ) : null
-                }
-              />
-            </div>
-
-            {/* Right Pane: Formatted Output */}
-            <div
-              className={`flex flex-col h-full ${
-                viewTab === "input" ? "hidden lg:flex" : "flex"
-              }`}
-            >
-              <CodeEditorPane
-                title="Formatted JSON"
-                subTitle={
-                  !inputJson.trim()
-                    ? "Output"
-                    : parseResult.valid
-                    ? `${indent === "tab" ? "Tab" : `${indent}-Space`} Indent`
-                    : "Awaiting valid input"
-                }
-                value={formattedOutput}
-                onChange={() => {}}
-                placeholder={
-                  !parseResult.valid
-                    ? "Fix syntax errors in Input to view formatted output..."
-                    : "Formatted JSON output will appear here..."
-                }
-                readOnly={true}
-                statusBadge={
-                  formattedOutput ? (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">
-                      Beautified
                     </span>
-                  ) : null
-                }
-                extraHeaderActions={
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    disabled={!formattedOutput}
-                    title="Download formatted JSON file"
-                    className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                  >
-                    <Download className="size-3.5" />
-                  </button>
-                }
-              />
-            </div>
-          </div>
+                  </div>
+                  {parseResult.error.excerpt && (
+                    <pre className="p-2 bg-destructive/15 text-destructive rounded overflow-x-auto text-[11px] leading-tight select-all">
+                      {parseResult.error.excerpt}
+                    </pre>
+                  )}
+                </div>
+              ) : null
+            }
+          />
         </div>
 
         {/* Informational & FAQ Section */}

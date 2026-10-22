@@ -42,8 +42,8 @@ export interface AppSidebarProps {
   // JSON Formatter specific sidebar props
   jsonIndent?: 2 | 4 | "tab" | 1;
   onJsonIndentChange?: (indent: 2 | 4 | "tab" | 1) => void;
-  jsonSortKeys?: boolean;
-  onToggleJsonSortKeys?: () => void;
+  jsonSortOrder?: "asc" | "desc" | null;
+  onJsonSortOrderChange?: (order: "asc" | "desc") => void;
   onJsonFormat?: () => void;
   onJsonMinify?: () => void;
   onJsonLoadSample?: () => void;
@@ -65,8 +65,8 @@ export function AppSidebar({
   onToggleDark,
   jsonIndent = 2,
   onJsonIndentChange,
-  jsonSortKeys = false,
-  onToggleJsonSortKeys,
+  jsonSortOrder = null,
+  onJsonSortOrderChange,
   onJsonFormat,
   onJsonMinify,
   onJsonLoadSample,
@@ -496,31 +496,27 @@ export function AppSidebar({
                     </button>
                   )}
 
-                  {onToggleJsonSortKeys && (
-                    <button
-                      type="button"
-                      onClick={onToggleJsonSortKeys}
-                      aria-pressed={jsonSortKeys}
-                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                        jsonSortKeys
-                          ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
-                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <ArrowDownAZ className="size-3.5" />
-                        <span>Sort Keys (A-Z)</span>
-                      </span>
-                      <span
-                        className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
-                          jsonSortKeys
-                            ? "bg-primary/15 border-primary/30 text-primary"
-                            : "bg-sidebar-accent border-sidebar-border text-muted-foreground"
-                        }`}
-                      >
-                        {jsonSortKeys ? "On" : "Off"}
-                      </span>
-                    </button>
+                  {onJsonSortOrderChange && (
+                    <div className="grid grid-cols-2 gap-1">
+                      {(["asc", "desc"] as const).map((order) => (
+                        <button
+                          key={order}
+                          type="button"
+                          onClick={() => onJsonSortOrderChange(order)}
+                          aria-pressed={jsonSortOrder === order}
+                          className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                            jsonSortOrder === order
+                              ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                          }`}
+                        >
+                          <ArrowDownAZ
+                            className={`size-3.5 ${order === "desc" ? "rotate-180" : ""}`}
+                          />
+                          <span>{order === "asc" ? "Sort A-Z" : "Sort Z-A"}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
 
                   {onJsonLoadSample && (
