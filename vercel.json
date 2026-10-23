@@ -14,5 +14,14 @@
       ]
     }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/json-formatter", "destination": "/index.html" },
+    { "source": "/tools", "destination": "/index.html" },
+    { "source": "/tools/(.*)", "destination": "/index.html" },
+    { "source": "/faq", "destination": "/index.html" },
+    { "source": "/blog", "destination": "/index.html" },
+    { "source": "/blog/(.*)", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
