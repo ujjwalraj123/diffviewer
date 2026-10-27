@@ -496,7 +496,7 @@ export default function ToolPage() {
                     showLineNumbers={true}
                     showIcon={false}
                     showStats={true}
-                    copyable={true}
+                    copyable={false}
                     variant="default"
                     searchSelection={
                       searchSelection

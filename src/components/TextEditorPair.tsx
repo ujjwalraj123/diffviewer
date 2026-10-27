@@ -29,6 +29,7 @@ export interface CodeEditorPaneProps {
   errorLength?: number
   statusBadge?: ReactNode
   extraHeaderActions?: ReactNode
+  editorNotice?: ReactNode
   footer?: ReactNode
   searchable?: boolean
   selectionRequest?: { start: number; length: number; token: number } | undefined
@@ -46,6 +47,7 @@ export function CodeEditorPane({
   errorLength = 1,
   statusBadge,
   extraHeaderActions,
+  editorNotice,
   footer,
   searchable = false,
   selectionRequest,
@@ -328,6 +330,8 @@ export function CodeEditorPane({
           )}
         </div>
       )}
+
+      {editorNotice}
 
       {/* Pane Editor Body */}
       <div className="flex-1 flex min-h-[360px] md:min-h-0 relative bg-background/50 font-mono text-[13px]">

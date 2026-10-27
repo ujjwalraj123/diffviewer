@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { ToolSwitcher } from "../components/ToolSwitcher";
 import { SearchResultsPanel, SearchToolbar } from "../components/SearchToolbar";
@@ -7,12 +7,10 @@ import { CodeEditorPane } from "../components/TextEditorPair";
 import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
-import { navigate } from "../lib/router";
 import { JSON_FAQS } from "../content/faqs";
 import { findTextMatches } from "../lib/utils";
 import {
   Sparkles,
-  GitCompare,
   Minimize2,
   ArrowDownAZ,
   RotateCcw,
@@ -20,6 +18,7 @@ import {
   Download,
   AlertCircle,
   CheckCircle2,
+  ArrowRight,
   HelpCircle,
   Upload,
   Layers,
@@ -37,6 +36,12 @@ interface JsonParseResult {
     length?: number;
     excerpt?: string;
   };
+}
+
+interface FileUploadStatus {
+  kind: "success" | "error";
+  message: string;
+  fileName?: string;
 }
 
 type IndentType = 2 | 4 | "tab" | 1;
@@ -130,9 +135,16 @@ function parseJsonWithError(raw: string): JsonParseResult {
       }
     }
 
-    if (errorPosition === undefined && line !== undefined && column !== undefined) {
+    if (
+      errorPosition === undefined &&
+      line !== undefined &&
+      column !== undefined
+    ) {
       errorPosition =
-        raw.split("\n").slice(0, line - 1).join("\n").length +
+        raw
+          .split("\n")
+          .slice(0, line - 1)
+          .join("\n").length +
         (line > 1 ? 1 : 0) +
         column -
         1;
@@ -235,7 +247,22 @@ export default function JsonFormatterPage() {
   const [searchSelection, setSearchSelection] = useState<
     { start: number; length: number; token: number } | undefined
   >();
+  const [fileUploadStatus, setFileUploadStatus] =
+    useState<FileUploadStatus | null>(null);
+  const [uploadCountdown, setUploadCountdown] = useState(3);
   const { dark, toggle } = useTheme();
+
+  useEffect(() => {
+    if (fileUploadStatus?.kind !== "success") return;
+    const timeoutId = window.setTimeout(() => {
+      if (uploadCountdown <= 1) {
+        setFileUploadStatus(null);
+      } else {
+        setUploadCountdown((countdown) => countdown - 1);
+      }
+    }, 1000);
+    return () => window.clearTimeout(timeoutId);
+  }, [fileUploadStatus, uploadCountdown]);
 
   // Parse input in real time
   const parseResult = useMemo(() => {
@@ -371,35 +398,63 @@ export default function JsonFormatterPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
+    setFileUploadStatus(null);
     reader.onload = (event) => {
       const content = event.target?.result;
       if (typeof content === "string") {
         setInputJson(content);
+        setUploadCountdown(3);
+        setFileUploadStatus({
+          kind: "success",
+          message: "File uploaded successfully",
+          fileName: file.name,
+        });
+      } else {
+        setFileUploadStatus({
+          kind: "error",
+          message: `Could not read "${file.name}" as text.`,
+        });
       }
     };
-    reader.readAsText(file);
+    reader.onerror = () => {
+      setFileUploadStatus({
+        kind: "error",
+        message: `Failed to read "${file.name}". Please try again.`,
+      });
+    };
+    try {
+      reader.readAsText(file);
+    } catch (error: unknown) {
+      setFileUploadStatus({
+        kind: "error",
+        message:
+          error instanceof Error
+            ? `Failed to read "${file.name}": ${error.message}`
+            : `Failed to read "${file.name}". Please try again.`,
+      });
+    }
     e.target.value = "";
   };
 
-  const handleSendToDiff = () => {
-    const formattedForDiff =
-      inputJson.trim() && parseResult.valid
-        ? formatJsonData(
-            parseResult.data,
-            indent,
-            sortOrder !== null,
-            sortOrder,
-          )
-        : inputJson;
-    try {
-      sessionStorage.setItem("dv_diff_left", inputJson);
-      sessionStorage.setItem("dv_diff_right", formattedForDiff);
-      sessionStorage.setItem("dv_diff_auto_mode", "diff");
-    } catch {
-      // ignore
-    }
-    navigate("/");
-  };
+  // const handleSendToDiff = () => {
+  //   const formattedForDiff =
+  //     inputJson.trim() && parseResult.valid
+  //       ? formatJsonData(
+  //           parseResult.data,
+  //           indent,
+  //           sortOrder !== null,
+  //           sortOrder,
+  //         )
+  //       : inputJson;
+  //   try {
+  //     sessionStorage.setItem("dv_diff_left", inputJson);
+  //     sessionStorage.setItem("dv_diff_right", formattedForDiff);
+  //     sessionStorage.setItem("dv_diff_auto_mode", "diff");
+  //   } catch {
+  //     // ignore
+  //   }
+  //   navigate("/");
+  // };
 
   const mobileActions: MobileHeaderAction[] = [
     {
@@ -506,7 +561,7 @@ export default function JsonFormatterPage() {
                 setSearchSelection(undefined);
               }}
             />
-            <button
+            {/* <button
               type="button"
               onClick={handleSendToDiff}
               disabled={!inputJson.trim()}
@@ -515,7 +570,7 @@ export default function JsonFormatterPage() {
             >
               <GitCompare className="size-3.5 text-primary" />
               <span className="hidden lg:inline">Compare in Diff</span>
-            </button>
+            </button>  */}
           </div>
         </div>
 
@@ -554,70 +609,112 @@ export default function JsonFormatterPage() {
 
         {/* Single editable JSON document */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 bg-background min-h-[500px]">
-          <CodeEditorPane
-            title="JSON Editor"
-            subTitle="Editable"
-            value={inputJson}
-            onChange={setInputJson}
-            placeholder="Paste or type JSON here..."
-            errorLine={parseResult.error?.line}
-            errorColumn={parseResult.error?.column}
-            errorLength={parseResult.error?.length}
-            selectionRequest={searchSelection}
-            extraHeaderActions={
-              <>
-                <label
-                  title="Upload .json file"
-                  className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-                >
-                  <Upload className="size-3.5" />
-                  <input
-                    type="file"
-                    accept=".json,application/json,text/plain"
-                    onChange={handleFileUpload}
-                    className="sr-only"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  disabled={!inputJson}
-                  title="Download current JSON"
-                  aria-label="Download current JSON"
-                  className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <Download className="size-3.5" />
-                </button>
-              </>
-            }
-            footer={
-              !parseResult.valid && parseResult.error ? (
-                <div className="p-3 bg-destructive/10 border-t border-destructive/20 text-xs space-y-1.5 font-mono">
-                  <div className="flex items-start gap-2 text-destructive font-semibold">
-                    <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                    <span className="leading-snug">
-                      {parseResult.error.message}
-                      {parseResult.error.line !== undefined && (
-                        <span>
-                          {" "}
-                          (Line {parseResult.error.line}
-                          {parseResult.error.column !== undefined
-                            ? `, column ${parseResult.error.column}`
-                            : ""}
-                          )
-                        </span>
-                      )}
+          {fileUploadStatus?.kind === "success" ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-8 text-center shadow-xs">
+              <span className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10">
+                <CheckCircle2 className="size-8 text-emerald-500" />
+              </span>
+              <span className="flex flex-col gap-1 text-xs">
+                <span className="font-semibold text-foreground">
+                  {fileUploadStatus.message}
+                </span>
+                {fileUploadStatus.fileName && (
+                  <span className="break-all text-muted-foreground">
+                    {fileUploadStatus.fileName}
+                  </span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                Opening editor in {uploadCountdown}…
+              </span>
+              <button
+                type="button"
+                onClick={() => setFileUploadStatus(null)}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                <span>Open Editor</span>
+                <ArrowRight className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <CodeEditorPane
+              title="JSON Editor"
+              subTitle="Editable"
+              value={inputJson}
+              onChange={setInputJson}
+              placeholder="Paste or type JSON here..."
+              errorLine={parseResult.error?.line}
+              errorColumn={parseResult.error?.column}
+              errorLength={parseResult.error?.length}
+              selectionRequest={searchSelection}
+              editorNotice={
+                fileUploadStatus?.kind === "error" ? (
+                  <div
+                    role="status"
+                    className="mx-3 mt-3 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-destructive sm:mx-4"
+                  >
+                    <AlertCircle className="size-5 shrink-0" />
+                    <span className="text-xs font-medium">
+                      {fileUploadStatus.message}
                     </span>
                   </div>
-                  {parseResult.error.excerpt && (
-                    <pre className="p-2 bg-destructive/15 text-destructive rounded overflow-x-auto text-[11px] leading-tight select-all">
-                      {parseResult.error.excerpt}
-                    </pre>
-                  )}
-                </div>
-              ) : null
-            }
-          />
+                ) : null
+              }
+              extraHeaderActions={
+                <>
+                  <label
+                    title="Upload .json file"
+                    className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+                  >
+                    <Upload className="size-3.5" />
+                    <input
+                      type="file"
+                      accept=".json,application/json,text/plain"
+                      onChange={handleFileUpload}
+                      className="sr-only"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={!inputJson}
+                    title="Download current JSON"
+                    aria-label="Download current JSON"
+                    className="inline-flex items-center justify-center size-7 rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <Download className="size-3.5" />
+                  </button>
+                </>
+              }
+              footer={
+                !parseResult.valid && parseResult.error ? (
+                  <div className="p-3 bg-destructive/10 border-t border-destructive/20 text-xs space-y-1.5 font-mono">
+                    <div className="flex items-start gap-2 text-destructive font-semibold">
+                      <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                      <span className="leading-snug">
+                        {parseResult.error.message}
+                        {parseResult.error.line !== undefined && (
+                          <span>
+                            {" "}
+                            (Line {parseResult.error.line}
+                            {parseResult.error.column !== undefined
+                              ? `, column ${parseResult.error.column}`
+                              : ""}
+                            )
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {parseResult.error.excerpt && (
+                      <pre className="p-2 bg-destructive/15 text-destructive rounded overflow-x-auto text-[11px] leading-tight select-all">
+                        {parseResult.error.excerpt}
+                      </pre>
+                    )}
+                  </div>
+                ) : null
+              }
+            />
+          )}
         </div>
 
         {/* Informational & FAQ Section */}
