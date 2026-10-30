@@ -1,6 +1,12 @@
 import { useEffect } from 'react'
 import { SITE } from '../config/site'
 
+declare global {
+  interface Window {
+    gtag: (command: string, ...args: unknown[]) => void
+  }
+}
+
 interface SeoProps {
   title: string
   description: string
@@ -11,6 +17,8 @@ interface SeoProps {
   image?: string
   imageAlt?: string
 }
+
+let lastTrackedPageView = ''
 
 function setMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`)
@@ -52,6 +60,17 @@ export function useSeo({ title, description, path, type = 'website', noindex, js
       document.head.appendChild(link)
     }
     link.href = url
+
+    const pageLocation = window.location.href
+    const pageViewKey = `${pageLocation}|${title}`
+    if (lastTrackedPageView !== pageViewKey) {
+      lastTrackedPageView = pageViewKey
+      window.gtag('event', 'page_view', {
+        page_path: `${window.location.pathname}${window.location.search}`,
+        page_location: pageLocation,
+        page_title: title,
+      })
+    }
 
     const id = 'page-jsonld'
     document.getElementById(id)?.remove()
