@@ -18,6 +18,10 @@ interface SeoProps {
   imageAlt?: string
 }
 
+declare global {
+  var __DIFFVIEWER_SSR_SEO__: ((props: SeoProps) => void) | undefined
+}
+
 let lastTrackedPageView = ''
 
 function setMeta(attr: 'name' | 'property', key: string, content: string) {
@@ -32,6 +36,18 @@ function setMeta(attr: 'name' | 'property', key: string, content: string) {
 
 export function useSeo({ title, description, path, type = 'website', noindex, jsonLd, image, imageAlt }: SeoProps) {
   const ld = jsonLd ? JSON.stringify(jsonLd) : ''
+  if (typeof window === 'undefined') {
+    globalThis.__DIFFVIEWER_SSR_SEO__?.({
+      title,
+      description,
+      path,
+      type,
+      noindex,
+      jsonLd,
+      image,
+      imageAlt,
+    })
+  }
   useEffect(() => {
     const url = SITE.url + (path === '/' ? '/' : path)
     const imageUrl = SITE.url + (image ?? SITE.image)

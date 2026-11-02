@@ -15,12 +15,14 @@
   ],
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
-    { "source": "/json-formatter", "destination": "/index.html" },
-    { "source": "/tools", "destination": "/index.html" },
+    { "source": "/json-formatter", "destination": "/json-formatter/index.html" },
+    { "source": "/tools", "destination": "/json-formatter/index.html" },
+    { "source": "/tools/json-formatter", "destination": "/json-formatter/index.html" },
+    { "source": "/tools/diff-viewer", "destination": "/index.html" },
     { "source": "/tools/(.*)", "destination": "/index.html" },
-    { "source": "/faq", "destination": "/index.html" },
-    { "source": "/blog", "destination": "/index.html" },
-    { "source": "/blog/(.*)", "destination": "/index.html" },
+    { "source": "/faq", "destination": "/faq/index.html" },
+    { "source": "/blog", "destination": "/blog/index.html" },
+    { "source": "/blog/:slug", "destination": "/blog/:slug/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

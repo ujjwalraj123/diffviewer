@@ -50,7 +50,7 @@ Open the local URL printed by Vite (the development server is configured to use 
 | Command | Description |
 |---|---|
 | `npm run dev` | Start the Vite development server |
-| `npm run build` | Generate the sitemap, type-check, and build the app to `dist/` |
+| `npm run build` | Generate the sitemap, type-check, build the app, and prerender indexable routes to `dist/` |
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint |
 | `npm run sitemap` | Generate `public/sitemap.xml` from the blog posts and tool routes |
@@ -63,7 +63,7 @@ Open the local URL printed by Vite (the development server is configured to use 
 - `/blog` — blog index
 - `/blog/:slug` — individual blog post
 
-The app uses a small History API router in `src/lib/router.ts`. Vercel rewrites routes to `index.html`, allowing app routes to load directly.
+The app uses a small History API router in `src/lib/router.ts`. Vercel rewrites route URLs to their prerendered HTML files so app routes load directly.
 
 ## Project structure
 
@@ -78,6 +78,7 @@ src/
   styles/           Global, app, and blog styles
 scripts/
   generate-sitemap.mjs
+  prerender.mjs
 public/             Static assets, robots.txt, and sitemap.xml
 ```
 
@@ -85,7 +86,7 @@ public/             Static assets, robots.txt, and sitemap.xml
 
 Add blog content to the `POSTS` array in `src/content/posts.ts`. Each post has a unique `slug`, title, description, publication date, estimated reading time, and sections. The sitemap generator reads post slugs and dates from this file and includes the tool, FAQ, blog index, and blog post URLs. It runs automatically before each production build; run `npm run sitemap` to regenerate it manually.
 
-Page titles, descriptions, canonical URLs, Open Graph metadata, and structured data are set by the pages using `src/hooks/useSeo.ts`.
+Page titles, descriptions, canonical URLs, Open Graph metadata, and structured data are set by the pages using `src/hooks/useSeo.ts`. The production build prerenders the homepage, tools, FAQ, blog index, and each blog post so their content and SEO metadata are present in the initial HTML.
 
 ## Deployment
 

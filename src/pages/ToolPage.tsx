@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AppLayout } from "../components/AppLayout";
+import { Link } from "../components/Link";
 import { ToolSwitcher } from "../components/ToolSwitcher";
 import { SearchResultsPanel, SearchToolbar } from "../components/SearchToolbar";
 import { TextEditorPair } from "../components/TextEditorPair";
@@ -522,12 +523,14 @@ export default function ToolPage() {
           <div className="max-w-4xl mx-auto space-y-10">
             <div className="text-center space-y-3">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                Online Diff Checker – Fast, Private &amp; Character-Accurate
+                Compare text, code, and files with DiffViewer
               </h2>
               <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                DiffViewer compares text, code, JSON, and documents side by
-                side with instant character-level highlighting. Everything
-                runs 100% in your browser for total privacy and speed.
+                Use this free online diff checker to compare two versions of
+                text, source code, JSON, or configuration files. Review
+                additions and deletions in split or unified view, with
+                character-level highlights. Comparisons run in your browser;
+                your input is not uploaded.
               </p>
             </div>
 
@@ -544,9 +547,9 @@ export default function ToolPage() {
                     key={f.q}
                     className="p-4 rounded-xl border border-border/70 bg-card text-card-foreground shadow-2xs space-y-1.5"
                   >
-                    <div className="font-medium text-xs text-foreground">
+                    <h4 className="font-medium text-xs text-foreground">
                       {f.q}
-                    </div>
+                    </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       {f.a}
                     </p>
@@ -554,6 +557,27 @@ export default function ToolPage() {
                 ))}
               </div>
             </div>
+
+            <nav aria-label="Related comparison guides and tools" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+              <Link
+                to="/blog/how-to-compare-two-text-files-online"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                How to compare two text files
+              </Link>
+              <Link
+                to="/blog/diff-vs-git-diff-what-is-the-difference"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Online diff checker vs. git diff
+              </Link>
+              <Link
+                to="/json-formatter"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Format and compare JSON
+              </Link>
+            </nav>
           </div>
         </section>
       </div>

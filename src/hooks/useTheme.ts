@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 
 export function useTheme() {
   const [dark, setDark] = useState(() => {
+    if (typeof window === 'undefined') return false
     try {
-      const s = localStorage.getItem('dv-theme')
-      if (s) return s === 'dark'
+      const saved = localStorage.getItem('dv-theme')
+      if (saved) return saved === 'dark'
     } catch { /* ignore */ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches
   })
