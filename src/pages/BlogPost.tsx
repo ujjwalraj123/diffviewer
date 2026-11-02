@@ -51,9 +51,9 @@ export default function BlogPost({ post }: { post: Post }) {
 
   return (
     <AppLayout dark={dark} onToggleDark={toggle}>
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-8 flex-1">
+      <main className="w-full min-w-0 max-w-3xl mx-auto px-6 py-10 space-y-8 flex-1">
         {/* Breadcrumbs */}
-        <nav className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Breadcrumb">
+        <nav className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" aria-label="Breadcrumb">
           <Link to="/" className="hover:text-foreground transition-colors">
             Home
           </Link>
@@ -62,13 +62,13 @@ export default function BlogPost({ post }: { post: Post }) {
             Blog
           </Link>
           <ChevronRight className="size-3 text-muted-foreground/50" />
-          <span className="text-foreground truncate max-w-xs">{post.title}</span>
+          <span className="min-w-0 max-w-xs truncate text-foreground">{post.title}</span>
         </nav>
 
         {/* Article Header */}
-        <article className="space-y-6">
+        <article className="min-w-0 space-y-6">
           <div className="space-y-3 border-b border-border pb-6">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground leading-tight">
+            <h1 className="break-words text-3xl font-bold tracking-tight text-foreground leading-tight">
               {post.title}
             </h1>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -80,7 +80,7 @@ export default function BlogPost({ post }: { post: Post }) {
           </div>
 
           {/* Article Sections */}
-          <div className="space-y-6 text-sm text-foreground/90 leading-relaxed">
+          <div className="min-w-0 space-y-6 text-sm text-foreground/90 leading-relaxed [overflow-wrap:anywhere]">
             {post.sections.map((s) => (
               <section key={s.heading} className="space-y-2.5">
                 <h2 className="text-xl font-semibold text-foreground tracking-tight pt-2">

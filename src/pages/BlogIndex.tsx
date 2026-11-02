@@ -43,7 +43,7 @@ export default function BlogIndex() {
 
   return (
     <AppLayout dark={dark} onToggleDark={toggle}>
-      <main className="max-w-4xl mx-auto px-6 py-10 space-y-8 flex-1">
+      <main className="w-full min-w-0 max-w-4xl mx-auto px-6 py-10 space-y-8 flex-1">
         <div className="space-y-2 border-b border-border pb-6">
           <div className="flex items-center gap-2 text-primary font-semibold text-xs tracking-wider uppercase">
             <BookOpen className="size-4" />
@@ -55,11 +55,11 @@ export default function BlogIndex() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
           {POSTS.map((p) => (
             <article
               key={p.slug}
-              className="p-5 rounded-xl border border-border bg-card text-card-foreground shadow-2xs hover:border-primary/50 transition-all flex flex-col justify-between group"
+              className="min-w-0 p-5 rounded-xl border border-border bg-card text-card-foreground shadow-2xs hover:border-primary/50 transition-all flex flex-col justify-between group"
             >
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -68,10 +68,10 @@ export default function BlogIndex() {
                   <span>·</span>
                   <span>{p.readMins} min read</span>
                 </div>
-                <h2 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
+                <h2 className="break-words text-base font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
                   <Link to={`/blog/${p.slug}`}>{p.title}</Link>
                 </h2>
-                <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed [overflow-wrap:anywhere]">
                   {p.description}
                 </p>
               </div>
