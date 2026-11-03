@@ -1,10 +1,11 @@
 import { AppLayout } from '../components/AppLayout'
 import { Link } from '../components/Link'
+import { ToolSwitcher } from '../components/ToolSwitcher'
 import { FAQS, JSON_FAQS } from '../content/faqs'
 import { SITE } from '../config/site'
 import { useSeo } from '../hooks/useSeo'
 import { useTheme } from '../hooks/useTheme'
-import { HelpCircle, GitCompare, ChevronRight } from 'lucide-react'
+import { HelpCircle, ChevronRight } from 'lucide-react'
 
 export default function FaqPage() {
   const { dark, toggle } = useTheme()
@@ -92,19 +93,13 @@ export default function FaqPage() {
         <aside className="p-6 rounded-xl border border-border bg-card shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h3 className="font-semibold text-sm text-foreground">
-              Ready to compare your files?
+              Ready to get started?
             </h3>
             <p className="text-xs text-muted-foreground">
-              Experience fast, private, character-accurate diffing right in your browser.
+              Choose a tool to compare text or format JSON, right in your browser.
             </p>
           </div>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs shrink-0 cursor-pointer"
-          >
-            <GitCompare className="size-3.5" />
-            <span>Open Diff Tool</span>
-          </Link>
+          <ToolSwitcher currentTool="diff" />
         </aside>
       </main>
     </AppLayout>

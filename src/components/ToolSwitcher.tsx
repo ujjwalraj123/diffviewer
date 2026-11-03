@@ -5,7 +5,7 @@ import { MobileActionsMenu, type MobileHeaderAction } from "./MobileActionsMenu"
 
 type ToolSwitcherProps = {
   currentTool: "diff" | "json";
-  actions: MobileHeaderAction[];
+  actions?: MobileHeaderAction[];
 };
 
 const tools = [
@@ -13,7 +13,7 @@ const tools = [
   { id: "json", label: "JSON Formatter", path: "/json-formatter", Icon: Braces },
 ] as const;
 
-export function ToolSwitcher({ currentTool, actions }: ToolSwitcherProps) {
+export function ToolSwitcher({ currentTool, actions = [] }: ToolSwitcherProps) {
   const selectedTool = currentTool === "diff" ? tools[0] : tools[1];
   const SelectedIcon = selectedTool.Icon;
 
@@ -46,7 +46,7 @@ export function ToolSwitcher({ currentTool, actions }: ToolSwitcherProps) {
                     onClick={() => navigate(path)}
                     className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                   >
-                    <Icon className="size-3.5" />
+                    {/* <Icon className="size-3.5" /> */}
                     <span className="flex-1">{label}</span>
                     {id === currentTool && <Check className="size-3.5" />}
                   </Menu.Item>
@@ -56,7 +56,7 @@ export function ToolSwitcher({ currentTool, actions }: ToolSwitcherProps) {
           </Menu.Portal>
         </Menu.Root>
       </h1>
-      <MobileActionsMenu actions={actions} />
+      {actions.length > 0 && <MobileActionsMenu actions={actions} />}
     </div>
   );
 }
