@@ -40,7 +40,7 @@ export function ToolSwitcher({ currentTool, actions = [] }: ToolSwitcherProps) {
           <Menu.Portal>
             <Menu.Positioner sideOffset={4} align="start" className="z-50 outline-none">
               <Menu.Popup className="min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none">
-                {tools.map(({ id, label, path, Icon }) => (
+                {tools.map(({ id, label, path, Icon: _Icon }) => (
                   <Menu.Item
                     key={id}
                     onClick={() => navigate(path)}

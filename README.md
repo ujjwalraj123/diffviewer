@@ -26,6 +26,7 @@ DiffViewer is a free, browser-based developer toolkit featuring an online text a
 ### Platform & UI
 - Dedicated Tools tab in sidebar navigation grouping Diff Tool and JSON Formatter.
 - Switch between light and dark themes; the theme preference is saved in the browser.
+- Installable as a Progressive Web App, with cached app assets for offline use.
 - Fully responsive interface optimized for both desktop and mobile devices.
 - Read built-in FAQs and comprehensive developer blog guides.
 - 100% client-side execution: text and JSON payloads are processed in the browser and are never uploaded.
@@ -64,6 +65,10 @@ Open the local URL printed by Vite (the development server is configured to use 
 - `/blog/:slug` — individual blog post
 
 The app uses a small History API router in `src/lib/router.ts`. Vercel rewrites route URLs to their prerendered HTML files so app routes load directly.
+
+## Progressive Web App
+
+The Vite PWA plugin generates the web app manifest and service worker during production builds. After opening the deployed site online once, the app shell and static assets are cached for later offline visits. When a new version is available, the app asks before reloading so open editor contents are not discarded without consent. PWA installation and service workers require HTTPS (except on localhost).
 
 ## Project structure
 
