@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useMemo, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { CopyButton } from './CopyButton'
-import { ClipboardPaste, Trash2, FileText, Search, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { ClipboardPaste, Trash2, FileText, Search, ChevronUp, ChevronDown, ChevronRight, X } from 'lucide-react'
 import { findTextMatches } from '../lib/utils'
 
 function getHighlightSegments(value: string, start: number, length: number) {
@@ -62,6 +62,50 @@ export interface CodeEditorPaneProps {
   selectionRequest?: { start: number; length: number; token: number } | undefined
   searchMatches?: Array<{ start: number; length: number }> | undefined
   activeSearchIndex?: number | undefined
+  jsonBlockIndent?: string
+}
+
+interface JsonBlock {
+  start: number
+  end: number
+  line: number
+}
+
+function findJsonBlocks(value: string): JsonBlock[] {
+  const stack: Array<{ start: number; line: number; open: string }> = []
+  const blocks: JsonBlock[] = []
+  let inString = false
+  let escaped = false
+  let line = 0
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') inString = false
+    } else if (character === '"') {
+      inString = true
+    } else if (character === '{' || character === '[') {
+      stack.push({ start: index, line, open: character })
+    } else if (character === '}' || character === ']') {
+      const current = stack[stack.length - 1]
+      if (
+        current &&
+        ((current.open === '{' && character === '}') ||
+          (current.open === '[' && character === ']'))
+      ) {
+        stack.pop()
+        if (index > current.start + 1) {
+          blocks.push({ start: current.start, end: index + 1, line: current.line })
+        }
+      }
+    }
+
+    if (character === '\n') line += 1
+  }
+
+  return blocks
 }
 
 export function CodeEditorPane({
@@ -82,6 +126,7 @@ export function CodeEditorPane({
   selectionRequest,
   searchMatches,
   activeSearchIndex,
+  jsonBlockIndent,
 }: CodeEditorPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const gutterRef = useRef<HTMLDivElement>(null)
@@ -97,6 +142,42 @@ export function CodeEditorPane({
   const matches = useMemo(() => findTextMatches(value, searchQuery), [searchQuery, value])
   const selectedMatchIndex =
     matches.length > 0 ? activeMatchIndex % matches.length : -1
+  const jsonBlocksByLine = useMemo(() => {
+    const blocksByLine = new Map<number, JsonBlock>()
+    if (jsonBlockIndent === undefined) return blocksByLine
+
+    for (const block of findJsonBlocks(value)) {
+      const existing = blocksByLine.get(block.line)
+      if (!existing || block.end > existing.end) {
+        blocksByLine.set(block.line, block)
+      }
+    }
+    return blocksByLine
+  }, [jsonBlockIndent, value])
+
+  const toggleJsonBlock = (block: JsonBlock) => {
+    if (jsonBlockIndent === undefined) return
+    const source = value.slice(block.start, block.end)
+    const parsed = JSON.parse(source) as unknown
+    let replacement: string
+    if (source.includes('\n')) {
+      replacement = JSON.stringify(parsed)
+    } else {
+      const expanded = JSON.stringify(parsed, null, jsonBlockIndent)
+      const lineStart = value.lastIndexOf('\n', block.start - 1) + 1
+      const lineIndent = value.slice(lineStart, block.start).match(/^\s*/)?.[0] ?? ''
+      replacement = expanded
+        .split('\n')
+        .map((expandedLine, index) =>
+          index === 0 ? expandedLine : `${lineIndent}${expandedLine}`,
+        )
+        .join('\n')
+    }
+
+    onChange(
+      `${value.slice(0, block.start)}${replacement}${value.slice(block.end)}`,
+    )
+  }
 
   // Synchronize gutter and highlight overlays with textarea scrolling
   const handleScroll = () => {
@@ -482,19 +563,44 @@ export function CodeEditorPane({
         {/* Line Numbers Gutter */}
         <div
           ref={gutterRef}
-          aria-hidden="true"
-          className="w-12 shrink-0 py-3 text-right pr-3 select-none text-muted-foreground/35 border-r border-border/40 overflow-hidden text-xs leading-[20px] font-mono z-[2] bg-background/95 backdrop-blur-xs"
+          role="group"
+          aria-label="Editor line numbers and JSON block controls"
+          style={{
+            width: `calc(${String(lineCount).length}ch + 1.75rem)`,
+          }}
+          className="min-w-12 shrink-0 py-3 px-1 select-none text-muted-foreground/35 border-r border-border/40 overflow-hidden text-xs leading-[20px] font-mono z-[2] bg-background/95 backdrop-blur-xs"
         >
           {Array.from({ length: lineCount }, (_, i) => {
             const isError = errorLine !== undefined && errorLine !== null && i + 1 === errorLine
+            const block = jsonBlocksByLine.get(i)
+            const isMinimized = block
+              ? !value.slice(block.start, block.end).includes('\n')
+              : false
             return (
               <div
                 key={i + 1}
-                className={`h-[20px] transition-colors ${
+                className={`grid h-[20px] grid-cols-[minmax(0,1fr)_14px] items-center gap-1 transition-colors ${
                   isError ? 'bg-destructive/25 text-destructive font-bold' : ''
                 }`}
               >
-                {i + 1}
+                <span className="text-right">{i + 1}</span>
+                {block && (
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => toggleJsonBlock(block)}
+                    title={`${isMinimized ? 'Expand' : 'Minimize'} JSON block on line ${i + 1}`}
+                    aria-label={`${isMinimized ? 'Expand' : 'Minimize'} JSON block on line ${i + 1}`}
+                    className="inline-flex size-3.5 items-center justify-center rounded-sm text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {isMinimized ? (
+                      <ChevronRight className="size-3" />
+                    ) : (
+                      <ChevronDown className="size-3" />
+                    )}
+                  </button>
+                )}
+                {!block && <span aria-hidden="true" className="size-3.5" />}
               </div>
             )
           })}

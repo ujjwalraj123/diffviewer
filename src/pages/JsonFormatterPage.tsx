@@ -11,7 +11,6 @@ import { JSON_FAQS } from "../content/faqs";
 import { findTextMatches } from "../lib/utils";
 import {
   Sparkles,
-  Minimize2,
   ArrowDownAZ,
   RotateCcw,
   Trash2,
@@ -828,14 +827,6 @@ function formatJsonData(
   );
 }
 
-function minifyJsonData(
-  data: unknown,
-  sortKeys = false,
-  sortOrder: "asc" | "desc" | null = "asc",
-): string {
-  return stringifyJsonData(data, 0, sortKeys, sortOrder);
-}
-
 export default function JsonFormatterPage() {
   const [inputJson, setInputJson] = useState<string>(SAMPLE_JSON);
   const [singleLineFieldName, setSingleLineFieldName] = useState("");
@@ -977,14 +968,6 @@ export default function JsonFormatterPage() {
         sortOrder,
         singleLineFieldName,
       ),
-    );
-  };
-
-  const handleMinify = () => {
-    if (!inputJson.trim() || !parseResult.valid) return;
-    setAutoFixChanges(null);
-    setInputJson(
-      minifyJsonData(parseResult.data, sortOrder !== null, sortOrder),
     );
   };
 
@@ -1176,12 +1159,6 @@ export default function JsonFormatterPage() {
       disabled: !parseResult.valid || !inputJson.trim(),
     },
     {
-      label: "Minify JSON",
-      Icon: Minimize2,
-      onSelect: handleMinify,
-      disabled: !parseResult.valid || !inputJson.trim(),
-    },
-    {
       label: "Sort Keys A-Z",
       Icon: ArrowDownAZ,
       onSelect: () => handleSortKeys("asc"),
@@ -1261,7 +1238,6 @@ export default function JsonFormatterPage() {
       jsonSortOrder={sortOrder}
       onJsonSortOrderChange={handleSortKeys}
       onJsonFormat={handleFormat}
-      onJsonMinify={handleMinify}
       onJsonLoadSample={handleLoadSample}
       onJsonClear={handleClear}
     >
@@ -1395,6 +1371,13 @@ export default function JsonFormatterPage() {
               selectionRequest={searchSelection}
               searchMatches={searchOpen && searchQuery ? searchResults : undefined}
               activeSearchIndex={selectedSearchIndex}
+              jsonBlockIndent={
+                hasStrictJsonSyntax
+                  ? indent === "tab"
+                    ? "\t"
+                    : " ".repeat(indent)
+                  : undefined
+              }
               editorNotice={
                 <>
                   {fileUploadStatus?.kind === "error" && (

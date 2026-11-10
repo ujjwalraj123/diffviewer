@@ -19,7 +19,6 @@ import {
   Braces,
   Wrench,
   Sparkles,
-  Minimize2,
   ArrowDownAZ,
   ChevronDown,
   ChevronRight,
@@ -44,7 +43,6 @@ export interface AppSidebarProps {
   jsonSortOrder?: "asc" | "desc" | null;
   onJsonSortOrderChange?: (order: "asc" | "desc") => void;
   onJsonFormat?: () => void;
-  onJsonMinify?: () => void;
   onJsonLoadSample?: () => void;
   onJsonClear?: () => void;
 }
@@ -66,7 +64,6 @@ export function AppSidebar({
   jsonSortOrder = null,
   onJsonSortOrderChange,
   onJsonFormat,
-  onJsonMinify,
   onJsonLoadSample,
   onJsonClear,
 }: AppSidebarProps) {
@@ -476,17 +473,6 @@ export function AppSidebar({
                     <Sparkles className="size-3.5" />
                     <span>Beautify / Format</span>
                   </button>
-
-                  {onJsonMinify && (
-                    <button
-                      type="button"
-                      onClick={onJsonMinify}
-                      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
-                    >
-                      <Minimize2 className="size-3.5" />
-                      <span>Minify (Compact)</span>
-                    </button>
-                  )}
 
                   {onJsonSortOrderChange && (
                     <div className="grid grid-cols-2 gap-1">
