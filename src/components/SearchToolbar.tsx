@@ -69,7 +69,7 @@ export function SearchToolbar({
               }}
               placeholder={placeholder}
               aria-label={placeholder}
-              className="h-8 w-36 rounded-md border border-border/60 bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-48"
+              className="h-8 w-36 rounded-md border border-primary/25 bg-background px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50 dark:border-primary/35 sm:w-48"
             />
             <span
               aria-live="polite"
@@ -115,7 +115,7 @@ export function SearchToolbar({
             onClick={() => onOpenChange(true)}
             title="Search (Ctrl+F)"
             aria-label="Search"
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/60 bg-background/80 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/25 bg-primary/5 px-2.5 text-xs text-foreground/80 transition-colors hover:bg-primary/10 hover:text-foreground dark:border-primary/40 dark:bg-primary/10 dark:hover:bg-primary/15"
           >
             <Search className="size-3.5" />
             <span>Search</span>
@@ -145,7 +145,7 @@ export function SearchResultsPanel({
     <div
       role="listbox"
       aria-label="Search results"
-      className="max-h-48 shrink-0 overflow-y-auto border-b border-border/60 bg-muted/20 px-3 py-1.5 sm:px-6"
+      className="max-h-48 shrink-0 overflow-y-auto custom-scrollbar border-b border-border/60 bg-muted/20 px-3 py-1.5 sm:px-6"
     >
       {resultCount === 0 ? (
         <div className="px-3 py-2 text-xs text-muted-foreground" role="status">

@@ -307,70 +307,72 @@ export default function ToolPage() {
           </div>
         </div>
 
-        {/* Secondary toolbar for shared search across both files */}
-        <div className="shrink-0 px-3 sm:px-6 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-end">
-          <SearchToolbar
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-xs">
+          {/* Secondary toolbar for shared search across both files */}
+          <div className="shrink-0 px-3 sm:px-6 py-2 bg-muted/20 flex items-center justify-end">
+            <SearchToolbar
+              open={searchOpen}
+              query={searchQuery}
+              resultCount={searchResults.length}
+              activeIndex={selectedSearchIndex}
+              placeholder="Search both files"
+              onOpenChange={setSearchOpen}
+              onQueryChange={(query) => {
+                setSearchQuery(query);
+                setActiveSearchIndex(-1);
+                setSearchSelection(null);
+              }}
+              onNavigate={navigateSearchResults}
+              onClose={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+                setSearchSelection(null);
+              }}
+            />
+          </div>
+
+          <SearchResultsPanel
             open={searchOpen}
             query={searchQuery}
             resultCount={searchResults.length}
-            activeIndex={selectedSearchIndex}
-            placeholder="Search both files"
-            onOpenChange={setSearchOpen}
-            onQueryChange={(query) => {
-              setSearchQuery(query);
-              setActiveSearchIndex(-1);
-              setSearchSelection(null);
-            }}
-            onNavigate={navigateSearchResults}
-            onClose={() => {
-              setSearchOpen(false);
-              setSearchQuery("");
-              setSearchSelection(null);
-            }}
-          />
-        </div>
-
-        <SearchResultsPanel
-          open={searchOpen}
-          query={searchQuery}
-          resultCount={searchResults.length}
-        >
-          {searchResults.map((result, index) => (
-            <button
-              key={`${result.side}-${result.start}-${result.value}`}
-              type="button"
-              role="option"
-              aria-selected={selectedSearchIndex === index}
-              onClick={() => selectSearchResult(index)}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors ${
-                selectedSearchIndex === index
-                  ? "bg-primary/15 text-primary"
-                  : "text-foreground hover:bg-accent"
-              }`}
-            >
-              <span
-                className={`shrink-0 rounded px-1.5 py-0.5 font-sans text-[10px] font-semibold ${
-                  result.side === "original"
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+          >
+            {searchResults.map((result, index) => (
+              <button
+                key={`${result.side}-${result.start}-${result.value}`}
+                type="button"
+                role="option"
+                aria-selected={selectedSearchIndex === index}
+                onClick={() => selectSearchResult(index)}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors ${
+                  selectedSearchIndex === index
+                    ? "bg-primary/15 text-primary"
+                    : "text-foreground hover:bg-accent"
                 }`}
               >
-                {result.side === "original" ? "Original" : "Modified"}
-              </span>
-              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                {result.line}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                {result.value}
-              </span>
-              {result.fuzzy && (
-                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
-                  Closest
+                <span
+                  className={`shrink-0 rounded px-1.5 py-0.5 font-sans text-[10px] font-semibold ${
+                    result.side === "original"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {result.side === "original" ? "Original" : "Modified"}
                 </span>
-              )}
-            </button>
-          ))}
-        </SearchResultsPanel>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                  {result.line}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                  {result.value}
+                </span>
+                {result.fuzzy && (
+                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
+                    Closest
+                  </span>
+                )}
+              </button>
+            ))}
+          </SearchResultsPanel>
+        </div>
 
         {/* Main work area */}
         <div

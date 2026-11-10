@@ -44,6 +44,11 @@ interface FileUploadStatus {
   fileName?: string;
 }
 
+interface AutoFixChange {
+  description: string;
+  line: number;
+}
+
 type IndentType = 2 | 4 | "tab" | 1;
 
 const SAMPLE_JSON = `{
@@ -70,7 +75,581 @@ const SAMPLE_JSON = `{
   }
 }`;
 
-function parseJsonWithError(raw: string): JsonParseResult {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getSingleLineFieldNames(value: string): string[] {
+  return [...new Set(value.split(",").map((name) => name.trim()).filter(Boolean))];
+}
+
+function getLineNumber(value: string, index: number): number {
+  return value.slice(0, index).split("\n").length;
+}
+
+function convertSingleQuotedStrings(
+  value: string,
+): { value: string; changes: AutoFixChange[] } {
+  let result = "";
+  const changes: AutoFixChange[] = [];
+  let inDoubleQuotedString = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (inDoubleQuotedString) {
+      result += character;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inDoubleQuotedString = false;
+      continue;
+    }
+
+    if (character === '"') {
+      inDoubleQuotedString = true;
+      result += character;
+      continue;
+    }
+
+    if (character !== "'") {
+      result += character;
+      continue;
+    }
+
+    const start = index;
+    let content = "";
+    let closed = false;
+    for (index += 1; index < value.length; index += 1) {
+      const current = value[index];
+      if (current === "'") {
+        closed = true;
+        break;
+      }
+      if (current === "\\" && index + 1 < value.length) {
+        const next = value[index + 1];
+        if (next === "'" || next === "\\" || next === '"') {
+          content += next;
+          index += 1;
+          continue;
+        }
+        if (next === "n") content += "\n";
+        else if (next === "r") content += "\r";
+        else if (next === "t") content += "\t";
+        else content += `\\${next}`;
+        index += 1;
+        continue;
+      }
+      content += current;
+    }
+
+    if (!closed) {
+      result += value.slice(start);
+      break;
+    }
+
+    result += JSON.stringify(content);
+    changes.push({
+      description: "Converted a single-quoted string to valid JSON quotes",
+      line: getLineNumber(value, start),
+    });
+  }
+
+  return { value: result, changes };
+}
+
+function quoteUnquotedKeys(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} {
+  let result = "";
+  const changes: AutoFixChange[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (inString) {
+      result += character;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      result += character;
+      continue;
+    }
+
+    result += character;
+    if (character !== "{" && character !== ",") continue;
+
+    let keyStart = index + 1;
+    while (/\s/.test(value[keyStart] ?? "")) keyStart += 1;
+    const keyMatch = /^[A-Za-z_$][\w$-]*/.exec(value.slice(keyStart));
+    if (!keyMatch) continue;
+
+    const keyEnd = keyStart + keyMatch[0].length;
+    let colonIndex = keyEnd;
+    while (/\s/.test(value[colonIndex] ?? "")) colonIndex += 1;
+    if (value[colonIndex] !== ":") continue;
+
+    result += value.slice(index + 1, keyStart);
+    result += JSON.stringify(keyMatch[0]);
+    result += value.slice(keyEnd, colonIndex + 1);
+    index = colonIndex;
+    changes.push({
+      description: `Added quotes around the "${keyMatch[0]}" property name`,
+      line: getLineNumber(value, keyStart),
+    });
+  }
+
+  return { value: result, changes };
+}
+
+function removeTrailingCommas(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} {
+  let result = "";
+  const changes: AutoFixChange[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (inString) {
+      result += character;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      result += character;
+      continue;
+    }
+
+    if (character !== ",") {
+      result += character;
+      continue;
+    }
+
+    let nextIndex = index + 1;
+    while (/\s/.test(value[nextIndex] ?? "")) nextIndex += 1;
+    if (value[nextIndex] === "}" || value[nextIndex] === "]") {
+      changes.push({
+        description: "Removed a trailing comma",
+        line: getLineNumber(value, index),
+      });
+      continue;
+    }
+
+    result += character;
+  }
+
+  return { value: result, changes };
+}
+
+function removeJsonComments(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} {
+  let result = "";
+  const changes: AutoFixChange[] = [];
+
+  for (let index = 0; index < value.length; ) {
+    if (value[index] === '"') {
+      const start = index;
+      let escaped = false;
+      result += value[index++];
+      while (index < value.length) {
+        const character = value[index++];
+        result += character;
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') break;
+      }
+      if (index === start) return { value: result, changes };
+      continue;
+    }
+
+    if (value[index] === "/" && value[index + 1] === "/") {
+      const start = index;
+      while (index < value.length && value[index] !== "\n") index += 1;
+      changes.push({
+        description: "Removed a line comment",
+        line: getLineNumber(value, start),
+      });
+      continue;
+    }
+
+    if (value[index] === "/" && value[index + 1] === "*") {
+      const start = index;
+      index += 2;
+      while (
+        index < value.length &&
+        !(value[index] === "*" && value[index + 1] === "/")
+      ) {
+        if (value[index] === "\n") result += "\n";
+        index += 1;
+      }
+      if (index < value.length) index += 2;
+      changes.push({
+        description: "Removed a block comment",
+        line: getLineNumber(value, start),
+      });
+      continue;
+    }
+
+    result += value[index];
+    index += 1;
+  }
+
+  return { value: result, changes };
+}
+
+function repairStringLiterals(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  let stringStart = -1;
+  const changes: AutoFixChange[] = [];
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (!inString) {
+      result += character;
+      if (character === '"') {
+        inString = true;
+        stringStart = index;
+      }
+      continue;
+    }
+
+    if (character === "\r" || character === "\n") {
+      const line = getLineNumber(value, index);
+      result += escaped ? "n" : "\\n";
+      escaped = false;
+      if (character === "\r" && value[index + 1] === "\n") index += 1;
+      changes.push({
+        description: "Escaped a line break inside a string",
+        line,
+      });
+      continue;
+    }
+
+    result += character;
+    if (escaped) escaped = false;
+    else if (character === "\\") escaped = true;
+    else if (character === '"') {
+      inString = false;
+      stringStart = -1;
+    }
+  }
+
+  if (inString) {
+    result += '"';
+    changes.push({
+      description: "Closed an unterminated string",
+      line: getLineNumber(value, stringStart),
+    });
+  }
+
+  return { value: result, changes };
+}
+
+function repairJsonStructure(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} | undefined {
+  type Token = {
+    kind: "punctuation" | "string" | "word";
+    value: string;
+    start: number;
+    end: number;
+  };
+  type Insertion = {
+    text: string;
+    description: string;
+  };
+
+  const tokens: Token[] = [];
+  for (let index = 0; index < value.length; ) {
+    if (/\s/.test(value[index])) {
+      index += 1;
+      continue;
+    }
+
+    const start = index;
+    const character = value[index];
+    if ("{}[],:".includes(character)) {
+      tokens.push({
+        kind: "punctuation",
+        value: character,
+        start,
+        end: ++index,
+      });
+      continue;
+    }
+
+    if (character === '"') {
+      let escaped = false;
+      index += 1;
+      while (index < value.length) {
+        const current = value[index];
+        if (current === "\n" || current === "\r") return undefined;
+        if (escaped) escaped = false;
+        else if (current === "\\") escaped = true;
+        else if (current === '"') {
+          index += 1;
+          break;
+        }
+        index += 1;
+      }
+      if (value[index - 1] !== '"') return undefined;
+      tokens.push({
+        kind: "string",
+        value: value.slice(start, index),
+        start,
+        end: index,
+      });
+      continue;
+    }
+
+    while (
+      index < value.length &&
+      !/\s/.test(value[index]) &&
+      !"{}[],:".includes(value[index])
+    ) {
+      index += 1;
+    }
+    if (index === start) return undefined;
+    tokens.push({
+      kind: "word",
+      value: value.slice(start, index),
+      start,
+      end: index,
+    });
+  }
+
+  const replacements = new Map<number, string>();
+  const insertions = new Map<number, Insertion[]>();
+  const changes: AutoFixChange[] = [];
+  const addInsertion = (position: number, text: string, description: string) => {
+    const atPosition = insertions.get(position) ?? [];
+    atPosition.push({ text, description });
+    insertions.set(position, atPosition);
+    changes.push({ description, line: getLineNumber(value, position) });
+  };
+
+  const parseValue = (startIndex: number): number | undefined => {
+    const token = tokens[startIndex];
+    if (!token) return undefined;
+    if (token.value === "{") return parseObject(startIndex + 1);
+    if (token.value === "[") return parseArray(startIndex + 1);
+    if (token.kind === "string") return startIndex + 1;
+
+    if (
+      token.kind === "word" &&
+      token.value !== "true" &&
+      token.value !== "false" &&
+      token.value !== "null" &&
+      !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(token.value)
+    ) {
+      replacements.set(startIndex, JSON.stringify(token.value));
+      changes.push({
+        description: `Quoted the unquoted value "${token.value}"`,
+        line: getLineNumber(value, token.start),
+      });
+    }
+    return startIndex + 1;
+  };
+
+  const parseObject = (startIndex: number): number | undefined => {
+    let index = startIndex;
+    if (tokens[index]?.value === "}") return index + 1;
+
+    while (index < tokens.length) {
+      const key = tokens[index];
+      if (key?.value === "]") {
+        addInsertion(key.start, "}", "Added a missing closing brace");
+        return index;
+      }
+      if (!key || (key.kind !== "string" && key.kind !== "word")) {
+        return undefined;
+      }
+      if (key.kind === "word") {
+        replacements.set(index, JSON.stringify(key.value));
+        changes.push({
+          description: `Added quotes around the "${key.value}" property name`,
+          line: getLineNumber(value, key.start),
+        });
+      }
+      index += 1;
+
+      if (tokens[index]?.value !== ":") {
+        const nextToken = tokens[index];
+        if (
+          !nextToken ||
+          nextToken.value === "}" ||
+          nextToken.value === "," ||
+          nextToken.value === "]"
+        ) {
+          return undefined;
+        }
+        addInsertion(
+          key.end,
+          ":",
+          `Added a missing colon after the "${key.value}" property name`,
+        );
+      } else {
+        index += 1;
+      }
+
+      const valueStart = index;
+      const valueEnd = parseValue(valueStart);
+      if (valueEnd === undefined) return undefined;
+      index = valueEnd;
+
+      if (tokens[index]?.value === ",") {
+        index += 1;
+        if (tokens[index]?.value === "}") return undefined;
+        continue;
+      }
+      if (tokens[index]?.value === "}") return index + 1;
+      if (tokens[index]?.value === "]") {
+        addInsertion(tokens[index].start, "}", "Added a missing closing brace");
+        return index;
+      }
+      if (index >= tokens.length) {
+        addInsertion(value.length, "}", "Added a missing closing brace");
+        return index;
+      }
+      addInsertion(
+        tokens[index - 1]?.end ?? key.end,
+        ",",
+        "Added a missing comma between object properties",
+      );
+    }
+
+    addInsertion(value.length, "}", "Added a missing closing brace");
+    return index;
+  };
+
+  const parseArray = (startIndex: number): number | undefined => {
+    let index = startIndex;
+    if (tokens[index]?.value === "]") return index + 1;
+
+    while (index < tokens.length) {
+      if (tokens[index]?.value === "}") {
+        addInsertion(tokens[index].start, "]", "Added a missing closing bracket");
+        return index;
+      }
+      const valueStart = index;
+      const valueEnd = parseValue(valueStart);
+      if (valueEnd === undefined) return undefined;
+      index = valueEnd;
+
+      if (tokens[index]?.value === ",") {
+        index += 1;
+        if (tokens[index]?.value === "]") return undefined;
+        continue;
+      }
+      if (tokens[index]?.value === "]") return index + 1;
+      if (tokens[index]?.value === "}") {
+        addInsertion(tokens[index].start, "]", "Added a missing closing bracket");
+        return index;
+      }
+      if (index >= tokens.length) {
+        addInsertion(value.length, "]", "Added a missing closing bracket");
+        return index;
+      }
+      addInsertion(
+        tokens[index - 1]?.end ?? value.length,
+        ",",
+        "Added a missing comma between array values",
+      );
+    }
+
+    addInsertion(value.length, "]", "Added a missing closing bracket");
+    return index;
+  };
+
+  if (!tokens.length) return undefined;
+  const nextToken = parseValue(0);
+  if (nextToken === undefined || nextToken !== tokens.length) return undefined;
+
+  let repaired = "";
+  let tokenIndex = 0;
+  for (let position = 0; position <= value.length; position += 1) {
+    const additions = insertions.get(position);
+    if (additions) repaired += additions.map(({ text }) => text).join("");
+    const token = tokens[tokenIndex];
+    if (!token || token.start !== position) {
+      if (position < value.length) repaired += value[position];
+      continue;
+    }
+
+    repaired += replacements.get(tokenIndex) ?? token.value;
+    position = token.end - 1;
+    tokenIndex += 1;
+  }
+
+  return { value: repaired, changes };
+}
+
+function recoverJsonWithSingleLineFields(
+  raw: string,
+  fieldNames: string[],
+  fieldIndex = 0,
+): JsonParseResult | undefined {
+  try {
+    return { valid: true, data: JSON.parse(raw) };
+  } catch {
+    if (fieldIndex >= fieldNames.length) return undefined;
+  }
+
+  const targetProperty = new RegExp(
+    `${escapeRegExp(JSON.stringify(fieldNames[fieldIndex]))}\\s*:\\s*"`,
+  ).exec(raw);
+  if (!targetProperty) {
+    return recoverJsonWithSingleLineFields(raw, fieldNames, fieldIndex + 1);
+  }
+
+  const openingQuote = targetProperty.index + targetProperty[0].lastIndexOf('"');
+  const contentStart = openingQuote + 1;
+  const propertyBoundary = /",\s*"((?:[^"\\]|\\.)*)"\s*:/g;
+  const remainingInput = raw.slice(contentStart);
+  let boundary: RegExpExecArray | null;
+
+  while ((boundary = propertyBoundary.exec(remainingInput))) {
+    const closingQuote = contentStart + boundary.index;
+    const repaired =
+      raw.slice(0, openingQuote) +
+      JSON.stringify(raw.slice(contentStart, closingQuote)) +
+      raw.slice(closingQuote + 1);
+    const result = recoverJsonWithSingleLineFields(
+      repaired,
+      fieldNames,
+      fieldIndex + 1,
+    );
+    if (result) return result;
+  }
+
+  return undefined;
+}
+
+function parseJsonWithError(
+  raw: string,
+  singleLineFieldNames: string,
+): JsonParseResult {
   if (!raw.trim()) {
     return { valid: true, data: null };
   }
@@ -78,6 +657,12 @@ function parseJsonWithError(raw: string): JsonParseResult {
   try {
     return { valid: true, data: JSON.parse(raw) };
   } catch (err: unknown) {
+    const recovered = recoverJsonWithSingleLineFields(
+      raw,
+      getSingleLineFieldNames(singleLineFieldNames),
+    );
+    if (recovered) return recovered;
+
     let message = err instanceof Error ? err.message : String(err);
     let line: number | undefined;
     let column: number | undefined;
@@ -179,8 +764,10 @@ function stringifyJsonData(
   indent: IndentType | 0,
   sortKeys: boolean,
   sortOrder: "asc" | "desc" | null = "asc",
+  singleLineFieldNames = "",
 ): string {
   const indentation = indent === "tab" ? "\t" : " ".repeat(indent);
+  const fieldNames = new Set(getSingleLineFieldNames(singleLineFieldNames));
 
   const stringify = (value: unknown, depth: number): string => {
     if (Array.isArray(value)) {
@@ -203,9 +790,14 @@ function stringifyJsonData(
       }
       if (keys.length === 0) return "{}";
       const properties = keys.map((key) => {
+        const propertyValue = (value as Record<string, unknown>)[key];
+        const formattedValue =
+          fieldNames.has(key) && typeof propertyValue === "string"
+            ? propertyValue.replace(/[ \t]*\r?\n[ \t]*/g, " ")
+            : propertyValue;
         const property = `${JSON.stringify(key)}${
           indentation ? ": " : ":"
-        }${stringify((value as Record<string, unknown>)[key], depth + 1)}`;
+        }${stringify(formattedValue, depth + 1)}`;
         return indentation
           ? `${indentation.repeat(depth + 1)}${property}`
           : property;
@@ -225,8 +817,15 @@ function formatJsonData(
   indent: IndentType,
   sortKeys = false,
   sortOrder: "asc" | "desc" | null = "asc",
+  singleLineFieldNames = "",
 ): string {
-  return stringifyJsonData(data, indent, sortKeys, sortOrder);
+  return stringifyJsonData(
+    data,
+    indent,
+    sortKeys,
+    sortOrder,
+    singleLineFieldNames,
+  );
 }
 
 function minifyJsonData(
@@ -239,6 +838,10 @@ function minifyJsonData(
 
 export default function JsonFormatterPage() {
   const [inputJson, setInputJson] = useState<string>(SAMPLE_JSON);
+  const [singleLineFieldName, setSingleLineFieldName] = useState("");
+  const [autoFixChanges, setAutoFixChanges] = useState<AutoFixChange[] | null>(
+    null,
+  );
   const [indent, setIndent] = useState<IndentType>(2);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -266,7 +869,15 @@ export default function JsonFormatterPage() {
 
   // Parse input in real time
   const parseResult = useMemo(() => {
-    return parseJsonWithError(inputJson);
+    return parseJsonWithError(inputJson, singleLineFieldName);
+  }, [inputJson, singleLineFieldName]);
+  const hasStrictJsonSyntax = useMemo(() => {
+    try {
+      JSON.parse(inputJson);
+      return true;
+    } catch {
+      return false;
+    }
   }, [inputJson]);
   const searchResults = useMemo(
     () => findTextMatches(inputJson, searchQuery),
@@ -288,9 +899,14 @@ export default function JsonFormatterPage() {
 
   const navigateSearchResults = (direction: 1 | -1) => {
     if (!searchResults.length) return;
+    const startIndex =
+      activeSearchIndex >= 0 && activeSearchIndex < searchResults.length
+        ? activeSearchIndex
+        : direction === 1
+          ? -1
+          : 0;
     const nextIndex =
-      (selectedSearchIndex + direction + searchResults.length) %
-      searchResults.length;
+      (startIndex + direction + searchResults.length) % searchResults.length;
     selectSearchResult(nextIndex);
   };
 
@@ -352,13 +968,21 @@ export default function JsonFormatterPage() {
 
   const handleFormat = () => {
     if (!inputJson.trim() || !parseResult.valid) return;
+    setAutoFixChanges(null);
     setInputJson(
-      formatJsonData(parseResult.data, indent, sortOrder !== null, sortOrder),
+      formatJsonData(
+        parseResult.data,
+        indent,
+        sortOrder !== null,
+        sortOrder,
+        singleLineFieldName,
+      ),
     );
   };
 
   const handleMinify = () => {
     if (!inputJson.trim() || !parseResult.valid) return;
+    setAutoFixChanges(null);
     setInputJson(
       minifyJsonData(parseResult.data, sortOrder !== null, sortOrder),
     );
@@ -367,15 +991,102 @@ export default function JsonFormatterPage() {
   const handleSortKeys = (order: "asc" | "desc") => {
     setSortOrder(order);
     if (inputJson.trim() && parseResult.valid) {
-      setInputJson(formatJsonData(parseResult.data, indent, true, order));
+      setAutoFixChanges(null);
+      setInputJson(
+        formatJsonData(
+          parseResult.data,
+          indent,
+          true,
+          order,
+          singleLineFieldName,
+        ),
+      );
     }
   };
 
+  const handleAutoFix = () => {
+    let candidate = inputJson;
+    const changes: AutoFixChange[] = [];
+    const stringResult = repairStringLiterals(candidate);
+    candidate = stringResult.value;
+    changes.push(...stringResult.changes);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const commentResult = removeJsonComments(candidate);
+      candidate = commentResult.value;
+      changes.push(...commentResult.changes);
+
+      const singleQuoteResult = convertSingleQuotedStrings(candidate);
+      candidate = singleQuoteResult.value;
+      changes.push(...singleQuoteResult.changes);
+
+      const keyResult = quoteUnquotedKeys(candidate);
+      candidate = keyResult.value;
+      changes.push(...keyResult.changes);
+
+      const commaResult = removeTrailingCommas(candidate);
+      candidate = commaResult.value;
+      changes.push(...commaResult.changes);
+    }
+
+    const structuralRepair = repairJsonStructure(candidate);
+    if (structuralRepair) {
+      candidate = structuralRepair.value;
+      changes.push(...structuralRepair.changes);
+    }
+
+    try {
+      JSON.parse(candidate);
+    } catch {
+      const fieldNames = getSingleLineFieldNames(singleLineFieldName);
+      const recovered = recoverJsonWithSingleLineFields(candidate, fieldNames);
+      if (!recovered) {
+        setAutoFixChanges([]);
+        return;
+      }
+
+      candidate = stringifyJsonData(
+        recovered.data,
+        indent,
+        sortOrder !== null,
+        sortOrder,
+        singleLineFieldName,
+      );
+      const recoveredField = fieldNames.find((fieldName) =>
+        inputJson.includes(`"${fieldName}"`),
+      );
+      if (recoveredField) {
+        const fieldPosition = inputJson.indexOf(`"${recoveredField}"`);
+        changes.push({
+          description: `Repaired the quoted string for "${recoveredField}"`,
+          line: getLineNumber(inputJson, fieldPosition),
+        });
+      }
+    }
+
+    try {
+      JSON.parse(candidate);
+    } catch {
+      setAutoFixChanges([]);
+      return;
+    }
+
+    if (candidate === inputJson || changes.length === 0) {
+      setAutoFixChanges([]);
+      return;
+    }
+
+    setInputJson(candidate);
+    setAutoFixChanges(changes);
+  };
+
   const handleLoadSample = () => {
+    setAutoFixChanges(null);
     setInputJson(SAMPLE_JSON);
   };
 
   const handleClear = () => {
+    setAutoFixChanges(null);
     setInputJson("");
   };
 
@@ -402,6 +1113,7 @@ export default function JsonFormatterPage() {
     reader.onload = (event) => {
       const content = event.target?.result;
       if (typeof content === "string") {
+        setAutoFixChanges(null);
         setInputJson(content);
         setUploadCountdown(3);
         setFileUploadStatus({
@@ -491,6 +1203,55 @@ export default function JsonFormatterPage() {
     },
   ];
 
+  const validationStatus = !inputJson.trim() ? (
+    <span className="text-muted-foreground">Ready for JSON input</span>
+  ) : !hasStrictJsonSyntax ? (
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/15 text-destructive border border-destructive/30">
+      <AlertCircle className="size-3.5" />
+      <span>{parseResult.valid ? "Syntax needs repair" : "Syntax Error"}</span>
+      {parseResult.error?.line && (
+        <span>
+          (Line {parseResult.error.line}
+          {parseResult.error.column ? `, Col ${parseResult.error.column}` : ""})
+        </span>
+      )}
+    </span>
+  ) : parseResult.valid ? (
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+      <CheckCircle2 className="size-3.5" />
+      <span>Valid JSON</span>
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/15 text-destructive border border-destructive/30">
+      <AlertCircle className="size-3.5" />
+      <span>Syntax Error</span>
+      {parseResult.error?.line && (
+        <span>
+          (Line {parseResult.error.line}
+          {parseResult.error.column ? `, Col ${parseResult.error.column}` : ""}
+          )
+        </span>
+      )}
+    </span>
+  );
+
+  const singleLineFieldsControl = (
+    <label className="inline-flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1 text-foreground dark:border-primary/40 dark:bg-primary/10">
+      <span className="whitespace-nowrap text-[11px] font-medium">
+        Keep on one line
+      </span>
+      <input
+        type="text"
+        value={singleLineFieldName}
+        onChange={(event) => setSingleLineFieldName(event.target.value)}
+        placeholder="field1, field2"
+        aria-label="JSON fields to keep on one line"
+        title="Enter comma-separated field names to keep their string values on one line"
+        className="h-7 w-36 rounded-md border border-primary/25 bg-background px-2 font-mono text-foreground placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      />
+    </label>
+  );
+
   return (
     <AppLayout
       dark={dark}
@@ -513,99 +1274,81 @@ export default function JsonFormatterPage() {
           </div>
         </div>
 
-        {/* Secondary toolbar with document stats, validation, and actions */}
-        <div className="px-3 sm:px-6 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-between text-xs flex-wrap gap-2">
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 flex-wrap">
-            <SearchToolbar
-              open={searchOpen}
-              query={searchQuery}
-              resultCount={searchResults.length}
-              activeIndex={selectedSearchIndex}
-              placeholder="Search JSON"
-              status={
-                !inputJson.trim() ? (
-                  <span className="text-muted-foreground">
-                    Ready for JSON input
-                  </span>
-                ) : parseResult.valid ? (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle2 className="size-3.5" />
-                    <span>Valid JSON</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/15 text-destructive border border-destructive/30">
-                    <AlertCircle className="size-3.5" />
-                    <span>Syntax Error</span>
-                    {parseResult.error?.line && (
-                      <span>
-                        (Line {parseResult.error.line}
-                        {parseResult.error.column
-                          ? `, Col ${parseResult.error.column}`
-                          : ""}
-                        )
-                      </span>
+        {/* Fixed / Sticky search toolbar & results container */}
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border/60 shadow-xs">
+          <div className="px-3 sm:px-6 py-2 bg-muted/20 flex items-center justify-between text-xs flex-wrap gap-2">
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 flex-wrap">
+              <SearchToolbar
+                open={searchOpen}
+                query={searchQuery}
+                resultCount={searchResults.length}
+                activeIndex={selectedSearchIndex}
+                placeholder="Search JSON"
+                status={
+                  <div className="flex flex-wrap items-center gap-3">
+                    {validationStatus}
+                    {singleLineFieldsControl}
+                    {!hasStrictJsonSyntax && inputJson.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleAutoFix}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/35 bg-primary/10 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                      >
+                        <Sparkles className="size-3.5" />
+                        <span>Auto-fix JSON</span>
+                      </button>
                     )}
-                  </span>
-                )
-              }
-              onOpenChange={setSearchOpen}
-              onQueryChange={(query) => {
-                setSearchQuery(query);
-                setActiveSearchIndex(-1);
-                setSearchSelection(undefined);
-              }}
-              onNavigate={navigateSearchResults}
-              onClose={() => {
-                setSearchOpen(false);
-                setSearchQuery("");
-                setSearchSelection(undefined);
-              }}
-            />
-            {/* <button
-              type="button"
-              onClick={handleSendToDiff}
-              disabled={!inputJson.trim()}
-              title="Send to Diff Tool to compare raw vs formatted side by side"
-              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-border/80 bg-background text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <GitCompare className="size-3.5 text-primary" />
-              <span className="hidden lg:inline">Compare in Diff</span>
-            </button>  */}
+                  </div>
+                }
+                onOpenChange={setSearchOpen}
+                onQueryChange={(query) => {
+                  setSearchQuery(query);
+                  setActiveSearchIndex(-1);
+                  setSearchSelection(undefined);
+                }}
+                onNavigate={navigateSearchResults}
+                onClose={() => {
+                  setSearchOpen(false);
+                  setSearchQuery("");
+                  setSearchSelection(undefined);
+                }}
+              />
+            </div>
           </div>
-        </div>
 
-        <SearchResultsPanel
-          open={searchOpen}
-          query={searchQuery}
-          resultCount={searchResults.length}
-        >
-          {searchResults.map((result, index) => (
-            <button
-              key={`${result.start}-${result.value}`}
-              type="button"
-              role="option"
-              aria-selected={selectedSearchIndex === index}
-              onClick={() => selectSearchResult(index)}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors ${
-                selectedSearchIndex === index
-                  ? "bg-primary/15 text-primary"
-                  : "text-foreground hover:bg-accent"
-              }`}
-            >
-              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                {result.line}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                {result.value}
-              </span>
-              {result.fuzzy && (
-                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
-                  Closest
+          <SearchResultsPanel
+            open={searchOpen}
+            query={searchQuery}
+            resultCount={searchResults.length}
+          >
+            {searchResults.map((result, index) => (
+              <button
+                key={`${result.start}-${result.value}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={selectedSearchIndex === index}
+                onClick={() => selectSearchResult(index)}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
+                  selectedSearchIndex === index
+                    ? "bg-primary/20 text-primary font-medium"
+                    : "text-foreground hover:bg-muted"
+                }`}
+              >
+                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                  {result.line}
                 </span>
-              )}
-            </button>
-          ))}
-        </SearchResultsPanel>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                  {result.value}
+                </span>
+                {result.fuzzy && (
+                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-sans text-[10px] text-primary">
+                    Closest
+                  </span>
+                )}
+              </button>
+            ))}
+          </SearchResultsPanel>
+        </div>
 
         {/* Single editable JSON document */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 bg-background min-h-[500px]">
@@ -641,24 +1384,62 @@ export default function JsonFormatterPage() {
               title="JSON Editor"
               subTitle="Editable"
               value={inputJson}
-              onChange={setInputJson}
+              onChange={(value) => {
+                setInputJson(value);
+                setAutoFixChanges(null);
+              }}
               placeholder="Paste or type JSON here..."
               errorLine={parseResult.error?.line}
               errorColumn={parseResult.error?.column}
               errorLength={parseResult.error?.length}
               selectionRequest={searchSelection}
+              searchMatches={searchOpen && searchQuery ? searchResults : undefined}
+              activeSearchIndex={selectedSearchIndex}
               editorNotice={
-                fileUploadStatus?.kind === "error" ? (
-                  <div
-                    role="status"
-                    className="mx-3 mt-3 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-destructive sm:mx-4"
-                  >
-                    <AlertCircle className="size-5 shrink-0" />
-                    <span className="text-xs font-medium">
-                      {fileUploadStatus.message}
-                    </span>
-                  </div>
-                ) : null
+                <>
+                  {fileUploadStatus?.kind === "error" && (
+                    <div
+                      role="status"
+                      className="mx-3 mt-3 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-destructive sm:mx-4"
+                    >
+                      <AlertCircle className="size-5 shrink-0" />
+                      <span className="text-xs font-medium">
+                        {fileUploadStatus.message}
+                      </span>
+                    </div>
+                  )}
+                  {autoFixChanges !== null && (
+                    <div
+                      role="status"
+                      className={`mx-3 mt-3 rounded-lg border px-3 py-2.5 text-xs sm:mx-4 ${
+                        autoFixChanges.length
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-foreground"
+                          : "border-amber-500/30 bg-amber-500/10 text-foreground"
+                      }`}
+                    >
+                      {autoFixChanges.length ? (
+                        <>
+                          <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                            Fixed {autoFixChanges.length} syntax{" "}
+                            {autoFixChanges.length === 1 ? "issue" : "issues"}:
+                          </p>
+                          <ul className="mt-1 list-inside list-disc space-y-0.5 text-muted-foreground">
+                            {autoFixChanges.map((change, index) => (
+                              <li key={`${change.line}-${index}`}>
+                                {change.description} (line {change.line})
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p>
+                          No safe automatic fix was found. Check the syntax
+                          error below and correct it manually.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
               }
               extraHeaderActions={
                 <>
