@@ -29,20 +29,10 @@ export default defineConfig({
         categories: ['developer', 'utilities'],
         icons: [
           {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any',
           },
         ],
         shortcuts: [
@@ -51,14 +41,14 @@ export default defineConfig({
             short_name: 'Diff',
             url: '/',
             description: 'Compare two texts or code snippets',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
           },
           {
             name: 'JSON Formatter',
             short_name: 'JSON',
             url: '/json-formatter',
             description: 'Format, validate and beautify JSON',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
           },
         ],
       },
