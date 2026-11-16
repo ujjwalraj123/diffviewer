@@ -4,11 +4,12 @@ import { SITE } from '../config/site'
 import { POSTS, type Post } from '../content/posts'
 import { useSeo } from '../hooks/useSeo'
 import { useTheme } from '../hooks/useTheme'
-import { Clock, ChevronRight, GitCompare } from 'lucide-react'
+import { Clock, ChevronRight, GitCompare, Braces } from 'lucide-react'
 
 export default function BlogPost({ post }: { post: Post }) {
   const { dark, toggle } = useTheme()
   const path = `/blog/${post.slug}`
+  const isJsonPost = post.slug === 'how-to-format-validate-and-beautify-json-online'
 
   useSeo({
     title: `${post.title} | DiffViewer`,
@@ -100,18 +101,20 @@ export default function BlogPost({ post }: { post: Post }) {
         <aside className="p-6 rounded-xl border border-border bg-card shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h3 className="font-semibold text-sm text-foreground">
-              Ready to compare your files?
+              {isJsonPost ? 'Ready to format your JSON?' : 'Ready to compare your files?'}
             </h3>
             <p className="text-xs text-muted-foreground">
-              Paste your text or code into our free browser diff checker.
+              {isJsonPost
+                ? 'Format and validate JSON privately in your browser.'
+                : 'Paste your text or code into our free browser diff checker.'}
             </p>
           </div>
           <Link
-            to="/"
+            to={isJsonPost ? '/json-formatter' : '/'}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs shrink-0"
           >
-            <GitCompare className="size-3.5" />
-            <span>Open Diff Tool</span>
+            {isJsonPost ? <Braces className="size-3.5" /> : <GitCompare className="size-3.5" />}
+            <span>{isJsonPost ? 'Open JSON Editor' : 'Open Diff Tool'}</span>
           </Link>
         </aside>
 
