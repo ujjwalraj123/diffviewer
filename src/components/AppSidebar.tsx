@@ -156,10 +156,6 @@ export function AppSidebar({
               </span>
             </div>
           </Link>
-
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border">
-            Free
-          </span>
         </div>
 
         <div className="shrink-0 flex justify-center py-2 border-b border-sidebar-border/70">
@@ -225,9 +221,6 @@ export function AppSidebar({
                       <Braces className="size-4 text-emerald-500" />
                       <span>JSON Formatter</span>
                     </div>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      New
-                    </span>
                   </Link>
                 </nav>
               )}
