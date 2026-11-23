@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { AppLayout } from "../components/AppLayout";
+import { StatsBar } from "../components/StatsBar";
 import { ToolSwitcher } from "../components/ToolSwitcher";
 import { SearchResultsPanel, SearchToolbar } from "../components/SearchToolbar";
 import type { MobileHeaderAction } from "../components/MobileActionsMenu";
@@ -8,7 +9,11 @@ import { useSeo } from "../hooks/useSeo";
 import { useTheme } from "../hooks/useTheme";
 import { SITE } from "../config/site";
 import { JSON_FAQS } from "../content/faqs";
-import { findTextMatches } from "../lib/utils";
+import {
+  findTextMatches,
+  formatByteSize,
+  getUtf8ByteLength,
+} from "../lib/utils";
 import {
   Sparkles,
   ArrowDownAZ,
@@ -50,6 +55,12 @@ interface AutoFixChange {
 
 type IndentType = 2 | 4 | "tab" | 1;
 
+interface JsonStats {
+  keyCount: number;
+  depth: number;
+  arrayCount: number;
+}
+
 const SAMPLE_JSON = `{
   "tool": "DiffViewer",
   "feature": "JSON Formatter & Validator",
@@ -73,6 +84,28 @@ const SAMPLE_JSON = `{
     "supportedFormats": ["json", "geojson", "jsonld", "ndjson"]
   }
 }`;
+
+function getJsonStats(value: unknown): JsonStats {
+  let keyCount = 0;
+  let depth = 0;
+  let arrayCount = 0;
+
+  const visit = (node: unknown, currentDepth: number) => {
+    if (Array.isArray(node)) {
+      arrayCount += 1;
+      depth = Math.max(depth, currentDepth);
+      node.forEach((item) => visit(item, currentDepth + 1));
+    } else if (node !== null && typeof node === "object") {
+      const entries = Object.entries(node);
+      keyCount += entries.length;
+      depth = Math.max(depth, currentDepth);
+      entries.forEach(([, item]) => visit(item, currentDepth + 1));
+    }
+  };
+
+  if (value !== null && typeof value === "object") visit(value, 1);
+  return { keyCount, depth, arrayCount };
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -862,6 +895,12 @@ export default function JsonFormatterPage() {
   const parseResult = useMemo(() => {
     return parseJsonWithError(inputJson, singleLineFieldName);
   }, [inputJson, singleLineFieldName]);
+  const jsonStats = useMemo(
+    () => (parseResult.valid ? getJsonStats(parseResult.data) : null),
+    [parseResult],
+  );
+  const inputSize = getUtf8ByteLength(inputJson);
+  const lineCount = inputJson ? inputJson.split("\n").length : 0;
   const hasStrictJsonSyntax = useMemo(() => {
     try {
       JSON.parse(inputJson);
@@ -1328,6 +1367,30 @@ export default function JsonFormatterPage() {
 
         {/* Single editable JSON document */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 bg-background min-h-[500px]">
+          {fileUploadStatus?.kind !== "success" && (
+            <div className="mb-3">
+              <StatsBar
+                ariaLabel="JSON document statistics"
+                highlightedLabel={jsonStats ? "Keys" : undefined}
+                stats={[
+                  { label: "Size", value: formatByteSize(inputSize) },
+                  {
+                    label: "Keys",
+                    value: jsonStats ? String(jsonStats.keyCount) : "—",
+                  },
+                  {
+                    label: "Depth",
+                    value: jsonStats ? String(jsonStats.depth) : "—",
+                  },
+                  {
+                    label: "Arrays",
+                    value: jsonStats ? String(jsonStats.arrayCount) : "—",
+                  },
+                  { label: "Lines", value: String(lineCount) },
+                ]}
+              />
+            </div>
+          )}
           {fileUploadStatus?.kind === "success" ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-8 text-center shadow-xs">
               <span className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10">

@@ -5,6 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function getUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length
+}
+
+export function formatByteSize(size: number): string {
+  if (size < 1024) return `${size} B`
+  const units = ["KB", "MB", "GB"]
+  let value = size / 1024
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`
+}
+
 export interface TextSearchMatch {
   start: number
   length: number

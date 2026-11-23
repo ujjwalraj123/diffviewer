@@ -158,10 +158,6 @@ export function AppSidebar({
           </Link>
         </div>
 
-        <div className="shrink-0 flex justify-center py-2 border-b border-sidebar-border/70">
-          <div google-add-preferred-source-btn="" />
-        </div>
-
         {/* Sidebar Navigation */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
           {/* Main Navigation */}

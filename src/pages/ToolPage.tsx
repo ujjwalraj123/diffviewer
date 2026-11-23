@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
 import { AppLayout } from "../components/AppLayout";
 import { Link } from "../components/Link";
+import { StatsBar } from "../components/StatsBar";
 import { ToolSwitcher } from "../components/ToolSwitcher";
 import { SearchResultsPanel, SearchToolbar } from "../components/SearchToolbar";
 import { TextEditorPair } from "../components/TextEditorPair";
-import { findTextMatches, type TextSearchMatch } from "../lib/utils";
+import {
+  findTextMatches,
+  formatByteSize,
+  getUtf8ByteLength,
+  type TextSearchMatch,
+} from "../lib/utils";
 import { CopyButton } from "../components/CopyButton";
+import { diffLines } from "diff";
 import {
   DiffViewer,
   DiffEditablePane,
@@ -35,6 +42,20 @@ interface DiffSearchSelection extends DiffSearchResult {
   column: number;
   token: number;
 }
+
+function normalizeForCompare(text: string): string {
+  return text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+}
+
+function getComparableLineCount(text: string): number {
+  const normalized = normalizeForCompare(text).replace(/\n$/, "");
+  return normalized ? normalized.split("\n").length : 0;
+}
+
+function getDiffChunkLineCount(text: string): number {
+  return text ? text.replace(/\n$/, "").split("\n").length : 0;
+}
+
 /*
 const SAMPLE_LEFT = `function greet(name) {
   return "Hello, " + name;
@@ -149,16 +170,45 @@ export default function ToolPage() {
   };
   */
 
-  // Treat inputs as identical when they only differ by line-ending style
-  // (CRLF vs LF) or a single trailing newline — these are cosmetic and should
-  // not be reported as differences (matches the diff viewer's normalization).
-  const normalizeForCompare = (text: string) =>
-    text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
   const isIdentical =
     left.length > 0 &&
     right.length > 0 &&
     normalizeForCompare(left) === normalizeForCompare(right);
   const isBothEmpty = left.trim().length === 0 && right.trim().length === 0;
+  const diffStats = useMemo(() => {
+    let additions = 0;
+    let deletions = 0;
+    let unchanged = 0;
+    const originalSizeBytes = getUtf8ByteLength(left);
+    const modifiedSizeBytes = getUtf8ByteLength(right);
+    const sizeDifference = modifiedSizeBytes - originalSizeBytes;
+
+    for (const change of diffLines(
+      normalizeForCompare(left),
+      normalizeForCompare(right),
+    )) {
+      const lineCount = getDiffChunkLineCount(change.value);
+      if (change.added) additions += lineCount;
+      else if (change.removed) deletions += lineCount;
+      else unchanged += lineCount;
+    }
+
+    return {
+      originalLines: getComparableLineCount(left),
+      modifiedLines: getComparableLineCount(right),
+      originalSize: formatByteSize(originalSizeBytes),
+      modifiedSize: formatByteSize(modifiedSizeBytes),
+      sizeDifference:
+        sizeDifference > 0
+          ? `+${formatByteSize(sizeDifference)}`
+          : sizeDifference < 0
+            ? `-${formatByteSize(Math.abs(sizeDifference))}`
+            : formatByteSize(0),
+      additions,
+      deletions,
+      unchanged,
+    };
+  }, [left, right]);
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
     const results: DiffSearchResult[] = [
@@ -395,6 +445,37 @@ export default function ToolPage() {
                 diffEditable ? "flex-none" : "flex-1"
               }`}
             >
+              {!diffEditable && (
+                <StatsBar
+                  ariaLabel="Text comparison statistics"
+                  highlightedLabel="Added"
+                  stats={[
+                    {
+                      label: "Original",
+                      value: String(diffStats.originalLines),
+                    },
+                    {
+                      label: "Modified",
+                      value: String(diffStats.modifiedLines),
+                    },
+                    {
+                      label: "Original Size",
+                      value: diffStats.originalSize,
+                    },
+                    {
+                      label: "Modified Size",
+                      value: diffStats.modifiedSize,
+                    },
+                    {
+                      label: "Size Diff",
+                      value: diffStats.sizeDifference,
+                    },
+                    { label: "Added", value: String(diffStats.additions) },
+                    { label: "Removed", value: String(diffStats.deletions) },
+                    { label: "Unchanged", value: String(diffStats.unchanged) },
+                  ]}
+                />
+              )}
               {diffEditable ? (
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* Original (editable) */}
