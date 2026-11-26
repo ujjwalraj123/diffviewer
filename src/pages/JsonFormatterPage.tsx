@@ -115,6 +115,31 @@ function getSingleLineFieldNames(value: string): string[] {
   return [...new Set(value.split(",").map((name) => name.trim()).filter(Boolean))];
 }
 
+function unescapeEscapedJsonQuotes(value: string): {
+  value: string;
+  changes: AutoFixChange[];
+} {
+  const firstEscapedQuote = value.indexOf('\\"');
+  if (firstEscapedQuote === -1) return { value, changes: [] };
+
+  const unescaped = value.replace(/\\"/g, '"');
+  try {
+    JSON.parse(unescaped);
+  } catch {
+    return { value, changes: [] };
+  }
+
+  return {
+    value: unescaped,
+    changes: [
+      {
+        description: "Removed escaping from JSON quotes",
+        line: getLineNumber(value, firstEscapedQuote),
+      },
+    ],
+  };
+}
+
 function getLineNumber(value: string, index: number): number {
   return value.slice(0, index).split("\n").length;
 }
@@ -1029,6 +1054,10 @@ export default function JsonFormatterPage() {
   const handleAutoFix = () => {
     let candidate = inputJson;
     const changes: AutoFixChange[] = [];
+    const escapedQuoteResult = unescapeEscapedJsonQuotes(candidate);
+    candidate = escapedQuoteResult.value;
+    changes.push(...escapedQuoteResult.changes);
+
     const stringResult = repairStringLiterals(candidate);
     candidate = stringResult.value;
     changes.push(...stringResult.changes);

@@ -2,7 +2,7 @@
 
 DiffViewer is a free, browser-based developer toolkit featuring an online text and code diff checker alongside a private JSON Formatter and Validator. Edit or paste text to inspect additions and deletions, or format, minify, and validate JSON payloads with instant character-level accuracy.
 
-**Live app:** [diffviewer-weld.vercel.app](https://diffviewer-weld.vercel.app/)
+**[Live app](https://diffviewer-weld.vercel.app/)**
 
 ## Features
 
@@ -18,6 +18,7 @@ DiffViewer is a free, browser-based developer toolkit featuring an online text a
 - Beautify and format raw JSON with customizable indentation (2 spaces, 4 spaces, or tab).
 - Minify JSON to strip all unnecessary whitespace and newlines for compact payloads.
 - Recursively sort object keys alphabetically while preserving array element order.
+- Auto-fix common JSON syntax issues, including extra escaping around quotes in pasted objects.
 - Real-time syntax validation that pinpoints errors by line number, column number, and visual caret pointer.
 - Two-pane editor layout with synchronized line gutters, line/character counters, clipboard actions, and file download.
 - Mobile view support with dedicated Input/Output tab toggling and responsive toolbar controls.
